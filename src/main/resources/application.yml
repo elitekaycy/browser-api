@@ -1,0 +1,48 @@
+spring:
+  application:
+    name: browser-api
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.community.dialect.SQLiteDialect
+
+  datasource:
+    url: jdbc:sqlite:browser-api.db
+    driver-class-name: org.sqlite.JDBC
+    # SQLite doesn't use username/password
+
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+
+browser-api:
+  project-name: browser-api
+  version: 1.0.0
+  base-path: /api/v1
+
+  browser:
+    headless: true
+    timeout-ms: 30000
+    max-sessions: 10
+    session-idle-timeout-ms: 300000  # 5 minutes
+
+  cache:
+    enabled: true
+    default-ttl-seconds: 3600  # 1 hour
+    component-ttl-seconds: 86400  # 24 hours
+    max-size-mb: 100
+
+logging:
+  level:
+    com.browserapi: INFO
+    org.springframework.web: INFO
+    org.hibernate: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
