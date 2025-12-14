@@ -10,17 +10,43 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.community.dialect.SQLiteDialect
+        # Generate better SQL for SQLite
+        jdbc:
+          lob:
+            non_contextual_creation: true
+    # Defer schema creation until after initialization
+    defer-datasource-initialization: false
+    open-in-view: false
 
   datasource:
-    url: jdbc:sqlite:browser-api.db
+    url: jdbc:sqlite:./data/browser-api.db
     driver-class-name: org.sqlite.JDBC
     # SQLite doesn't use username/password
+    # Connection pool settings
+    hikari:
+      maximum-pool-size: 1  # SQLite only supports single writer
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
 
 server:
   port: 8080
   error:
     include-message: always
     include-binding-errors: always
+
+springdoc:
+  api-docs:
+    path: /api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    tags-sorter: alpha
+    operations-sorter: alpha
+    display-request-duration: true
+    try-it-out-enabled: true
+  show-actuator: false
 
 browser-api:
   project-name: browser-api
