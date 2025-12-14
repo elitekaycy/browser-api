@@ -267,6 +267,74 @@ com.browserapi/
 - Group related methods together
 - Keep files under 300 lines
 
+## Comments & Documentation
+
+### Production-Ready Comments Only
+
+Write comments that would be valuable in production code. Avoid temporary, obvious, or debug comments.
+
+```java
+// ✅ GOOD - Production-worthy comments
+/**
+ * Extracts CSS rules that apply to the given element.
+ * Includes both inline styles and matching stylesheet rules.
+ *
+ * @param element the target element
+ * @return deduplicated CSS rules sorted by specificity
+ */
+public List<CSSRule> extractStyles(Element element) {
+    // Shadow DOM requires special handling for style isolation
+    if (element.shadowRoot() != null) {
+        return extractShadowStyles(element);
+    }
+    return extractNormalStyles(element);
+}
+
+// ✅ GOOD - Explaining non-obvious business logic
+// SQLite only supports one writer at a time, pool size must be 1
+hikari.setMaximumPoolSize(1);
+
+// ✅ GOOD - Warning about important constraints
+// Do not change: Playwright sessions must be closed on the same thread that created them
+threadLocal.get().close();
+
+// ❌ BAD - Obvious comment
+// Get the URL
+String url = request.getUrl();
+
+// ❌ BAD - Commented-out code (delete instead)
+// String oldMethod = doSomethingOld();
+// return oldMethod.transform();
+
+// ❌ BAD - TODO/FIXME in production
+// TODO: fix this later
+// FIXME: temporary hack
+
+// ❌ BAD - Debug/noise comments
+// System.out.println("DEBUG: entering method");
+// calling the service
+var result = service.process();
+```
+
+### When to Write Comments
+
+```
+✅ Write comments for:
+- Complex algorithms or business logic
+- Non-obvious technical decisions
+- Workarounds for library bugs
+- Performance-critical sections
+- Security-sensitive code
+- Public API documentation (Javadoc)
+
+❌ Don't write comments for:
+- Obvious code (let the code speak)
+- Commented-out code (use git history)
+- TODOs or FIXMEs (create tickets instead)
+- Change history (use git commits)
+- Debug statements
+```
+
 ## What NOT to Do
 
 ### Don't Generate Documentation Files Unnecessarily
@@ -281,7 +349,7 @@ com.browserapi/
 
 ✅ GOOD - Do create:
 - Javadoc for public APIs
-- Code comments for complex logic
+- Production-worthy code comments (see above)
 - OpenAPI annotations for endpoints
 ```
 
