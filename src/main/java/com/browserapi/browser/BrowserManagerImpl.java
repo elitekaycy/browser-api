@@ -30,13 +30,15 @@ public class BrowserManagerImpl implements BrowserManager, DisposableBean {
     private static final Logger log = LoggerFactory.getLogger(BrowserManagerImpl.class);
 
     private final ProjectConfig config;
+    private final NavigationHelper navigationHelper;
     private final ConcurrentHashMap<UUID, PageSession> activeSessions = new ConcurrentHashMap<>();
 
     private Playwright playwright;
     private Browser browser;
 
-    public BrowserManagerImpl(ProjectConfig config) {
+    public BrowserManagerImpl(ProjectConfig config, NavigationHelper navigationHelper) {
         this.config = config;
+        this.navigationHelper = navigationHelper;
     }
 
     /**
@@ -68,8 +70,21 @@ public class BrowserManagerImpl implements BrowserManager, DisposableBean {
 
     @Override
     public PageSession createSession(String url) {
+        return createSession(url, WaitStrategy.LOAD, null);
+    }
+
+    @Override
+    public PageSession createSession(String url, WaitStrategy waitStrategy) {
+        return createSession(url, waitStrategy, null);
+    }
+
+    @Override
+    public PageSession createSession(String url, WaitStrategy waitStrategy, Long timeoutMs) {
         if (url == null || url.isBlank()) {
             throw new IllegalArgumentException("URL cannot be null or blank");
+        }
+        if (waitStrategy == null) {
+            waitStrategy = WaitStrategy.LOAD;
         }
 
         // Enforce session limit
@@ -83,27 +98,30 @@ public class BrowserManagerImpl implements BrowserManager, DisposableBean {
         }
 
         try {
-            log.debug("Creating new browser session for URL: {}", url);
+            log.debug("Creating new browser session for URL: {} (strategy: {}, timeout: {}ms)",
+                    url, waitStrategy, timeoutMs != null ? timeoutMs : "default");
 
             // Create new page with timeout
             Page page = browser.newPage();
-            page.setDefaultTimeout(config.getBrowser().getTimeoutMs());
+            page.setDefaultTimeout(timeoutMs != null ? timeoutMs : config.getBrowser().getTimeoutMs());
 
-            // Navigate to URL with wait for load state
-            page.navigate(url, new Page.NavigateOptions().setWaitUntil(
-                    com.microsoft.playwright.options.WaitUntilState.LOAD
-            ));
+            // Navigate using NavigationHelper with retry logic
+            navigationHelper.navigateWithRetry(page, url, waitStrategy, timeoutMs);
 
             PageSession session = new PageSession(page, url);
             activeSessions.put(session.sessionId(), session);
 
-            log.info("Browser session created: {} (active: {}/{})",
+            log.info("Browser session created: {} (active: {}/{}, strategy: {})",
                     session.sessionId(),
                     activeSessions.size(),
-                    maxSessions);
+                    maxSessions,
+                    waitStrategy);
 
             return session;
 
+        } catch (BrowserException e) {
+            // NavigationHelper already provides detailed error messages
+            throw e;
         } catch (Exception e) {
             log.error("Failed to create browser session for URL: {}", url, e);
             throw new BrowserException("Failed to create browser session for: " + url, e);

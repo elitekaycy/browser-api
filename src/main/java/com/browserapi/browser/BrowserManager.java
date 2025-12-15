@@ -19,6 +19,7 @@ public interface BrowserManager {
 
     /**
      * Creates a new browser session with a page navigated to the specified URL.
+     * Uses default LOAD wait strategy.
      * Reuses the existing browser instance for performance.
      *
      * @param url the URL to navigate to
@@ -26,6 +27,29 @@ public interface BrowserManager {
      * @throws BrowserException if session creation fails or max sessions exceeded
      */
     PageSession createSession(String url);
+
+    /**
+     * Creates a new browser session with a page navigated to the specified URL.
+     * Allows specifying custom wait strategy for different page types.
+     *
+     * @param url the URL to navigate to
+     * @param waitStrategy the wait strategy to use (LOAD, NETWORKIDLE, etc.)
+     * @return PageSession containing the Playwright page and metadata
+     * @throws BrowserException if session creation fails or max sessions exceeded
+     */
+    PageSession createSession(String url, WaitStrategy waitStrategy);
+
+    /**
+     * Creates a new browser session with a page navigated to the specified URL.
+     * Allows specifying both wait strategy and custom timeout.
+     *
+     * @param url the URL to navigate to
+     * @param waitStrategy the wait strategy to use
+     * @param timeoutMs custom timeout in milliseconds (null = use default)
+     * @return PageSession containing the Playwright page and metadata
+     * @throws BrowserException if session creation fails or max sessions exceeded
+     */
+    PageSession createSession(String url, WaitStrategy waitStrategy, Long timeoutMs);
 
     /**
      * Closes a specific browser session and releases its resources.
