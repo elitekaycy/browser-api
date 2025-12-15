@@ -1,5 +1,7 @@
 package com.browserapi.controller;
 
+import com.browserapi.browser.WaitStrategy;
+import com.browserapi.extraction.ExtractionType;
 import com.browserapi.extraction.dto.ExtractionRequest;
 import com.browserapi.extraction.dto.ExtractionResponse;
 import com.browserapi.extraction.exception.ExtractionException;
@@ -14,6 +16,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * REST API controller for content extraction operations.
@@ -38,7 +43,7 @@ public class ExtractionController {
      * @param request extraction parameters (url, type, selector, options)
      * @return extraction response with data and metadata
      */
-    @PostMapping
+    @GetMapping
     @Operation(
             summary = "Extract content from webpage",
             description = """
@@ -49,17 +54,10 @@ public class ExtractionController {
                     - CSS: Extract computed styles (coming soon)
                     - JSON: Extract structured data (coming soon)
 
-                    Example request:
-                    {
-                      "url": "https://example.com",
-                      "type": "HTML",
-                      "selector": ".content",
-                      "waitStrategy": "LOAD",
-                      "options": {
-                        "includeOuter": false,
-                        "cleanHTML": true
-                      }
-                    }
+                    Example requests:
+                    - GET /api/v1/extract?url=https://example.com&type=HTML&selector=h1
+                    - GET /api/v1/extract?url=https://example.com&type=HTML&selector=.content&outer=true&clean=true
+                    - GET /api/v1/extract?url=https://example.com&type=HTML&selector=.product&all=true
                     """,
             responses = {
                     @ApiResponse(
@@ -93,10 +91,36 @@ public class ExtractionController {
                     )
             }
     )
-    public ResponseEntity<?> extract(@RequestBody ExtractionRequest request) {
+    public ResponseEntity<?> extract(
+            @RequestParam String url,
+            @RequestParam ExtractionType type,
+            @RequestParam String selector,
+            @RequestParam(name = "wait", required = false) WaitStrategy waitStrategy,
+            @RequestParam(required = false) Boolean outer,
+            @RequestParam(required = false) Boolean all,
+            @RequestParam(required = false) Boolean clean,
+            @RequestParam(name = "no_scripts", required = false) Boolean noScripts,
+            @RequestParam(name = "no_comments", required = false) Boolean noComments,
+            @RequestParam(required = false) Boolean normalize
+    ) {
         try {
-            log.info("Extraction request received: type={}, url={}, selector={}",
-                    request.type(), request.url(), request.selector());
+            log.info("Extraction request received: type={}, url={}, selector={}", type, url, selector);
+
+            Map<String, Object> options = new HashMap<>();
+            if (outer != null) options.put("includeOuter", outer);
+            if (all != null) options.put("multiple", all);
+            if (clean != null) options.put("cleanHTML", clean);
+            if (noScripts != null) options.put("removeScripts", noScripts);
+            if (noComments != null) options.put("removeComments", noComments);
+            if (normalize != null) options.put("normalizeWhitespace", normalize);
+
+            ExtractionRequest request = new ExtractionRequest(
+                    url,
+                    type,
+                    selector,
+                    waitStrategy,
+                    options
+            );
 
             ExtractionResponse response = extractionService.extract(request);
 
