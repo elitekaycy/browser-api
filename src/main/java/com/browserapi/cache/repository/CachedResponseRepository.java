@@ -65,4 +65,14 @@ public interface CachedResponseRepository extends JpaRepository<CachedResponse, 
      * @return count of entries expiring soon
      */
     long countByExpiresAtBefore(LocalDateTime threshold);
+
+    /**
+     * Deletes all cache entries for a specific URL.
+     * Used for cache invalidation when content changes.
+     *
+     * @param url the URL to invalidate
+     * @return number of deleted entries
+     */
+    @Modifying
+    int deleteByUrl(String url);
 }

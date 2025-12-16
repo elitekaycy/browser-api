@@ -2,6 +2,7 @@ package com.browserapi.extraction.service;
 
 import com.browserapi.browser.BrowserManager;
 import com.browserapi.browser.PageSession;
+import com.browserapi.cache.service.CacheService;
 import com.browserapi.extraction.ExtractionType;
 import com.browserapi.extraction.dto.ExtractionRequest;
 import com.browserapi.extraction.dto.ExtractionResponse;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -41,6 +43,7 @@ public class ExtractionService {
     private static final Logger log = LoggerFactory.getLogger(ExtractionService.class);
 
     private final BrowserManager browserManager;
+    private final CacheService cacheService;
     private final Map<ExtractionType, ExtractionStrategy> strategies;
 
     /**
@@ -48,10 +51,13 @@ public class ExtractionService {
      * Spring automatically injects all beans implementing ExtractionStrategy.
      *
      * @param browserManager browser session manager
+     * @param cacheService cache service for response caching
      * @param strategyList all extraction strategy implementations (auto-injected)
      */
-    public ExtractionService(BrowserManager browserManager, List<ExtractionStrategy> strategyList) {
+    public ExtractionService(BrowserManager browserManager, CacheService cacheService,
+                           List<ExtractionStrategy> strategyList) {
         this.browserManager = browserManager;
+        this.cacheService = cacheService;
 
         // Build strategy registry: ExtractionType -> Strategy
         this.strategies = strategyList.stream()
@@ -91,10 +97,22 @@ public class ExtractionService {
 
         long startTime = System.currentTimeMillis();
 
-        // 1. Get strategy for this extraction type
+        // 1. Check cache first
+        Optional<ExtractionResponse> cached = cacheService.get(request);
+        if (cached.isPresent()) {
+            long duration = System.currentTimeMillis() - startTime;
+            log.info("Cache HIT: type={}, selector={}, duration={}ms (from cache)",
+                    request.type(), request.selector(), duration);
+            return cached.get();
+        }
+
+        // 2. Cache MISS - proceed with extraction
+        log.debug("Cache MISS: proceeding with browser extraction");
+
+        // 3. Get strategy for this extraction type
         ExtractionStrategy strategy = getStrategy(request.type());
 
-        // 2. Validate strategy can handle request
+        // 4. Validate strategy can handle request
         if (!strategy.canHandle(request)) {
             throw new ExtractionException(
                     "Strategy %s cannot handle request: %s"
@@ -104,16 +122,19 @@ public class ExtractionService {
 
         PageSession session = null;
         try {
-            // 3. Create browser session and navigate
+            // 5. Create browser session and navigate
             log.debug("Creating browser session for URL: {}", request.url());
             session = browserManager.createSession(
                     request.url(),
                     request.waitStrategy()
             );
 
-            // 4. Delegate to strategy
+            // 6. Delegate to strategy
             log.debug("Delegating to strategy: {}", strategy.getClass().getSimpleName());
             ExtractionResponse response = strategy.extract(request, session);
+
+            // 7. Store in cache
+            cacheService.put(request, response);
 
             long duration = System.currentTimeMillis() - startTime;
             log.info("Extraction completed: type={}, selector={}, duration={}ms, dataSize={}",
@@ -139,7 +160,7 @@ public class ExtractionService {
             );
 
         } finally {
-            // 5. Always cleanup session
+            // 8. Always cleanup session
             if (session != null) {
                 try {
                     browserManager.closeSession(session.sessionId());
