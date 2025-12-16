@@ -64,6 +64,10 @@ browser-api:
     default-ttl-seconds: 3600  # 1 hour
     component-ttl-seconds: 86400  # 24 hours
     max-size-mb: 100
+    ttl:
+      html: 3600      # 1 hour - content changes frequently
+      css: 86400      # 24 hours - styles change rarely
+      json: 1800      # 30 minutes - structured data varies
 
 logging:
   level:
