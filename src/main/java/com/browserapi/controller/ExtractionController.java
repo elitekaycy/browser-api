@@ -96,23 +96,29 @@ public class ExtractionController {
             @RequestParam ExtractionType type,
             @RequestParam String selector,
             @RequestParam(name = "wait", required = false) WaitStrategy waitStrategy,
-            @RequestParam(required = false) Boolean outer,
             @RequestParam(required = false) Boolean all,
+            @RequestParam(required = false) Boolean outer,
             @RequestParam(required = false) Boolean clean,
             @RequestParam(name = "no_scripts", required = false) Boolean noScripts,
             @RequestParam(name = "no_comments", required = false) Boolean noComments,
-            @RequestParam(required = false) Boolean normalize
+            @RequestParam(required = false) Boolean normalize,
+            @RequestParam(required = false) String format,
+            @RequestParam(required = false) Boolean attributes,
+            @RequestParam(name = "include_text", required = false) Boolean includeText
     ) {
         try {
             log.info("Extraction request received: type={}, url={}, selector={}", type, url, selector);
 
             Map<String, Object> options = new HashMap<>();
-            if (outer != null) options.put("includeOuter", outer);
             if (all != null) options.put("multiple", all);
+            if (outer != null) options.put("includeOuter", outer);
             if (clean != null) options.put("cleanHTML", clean);
             if (noScripts != null) options.put("removeScripts", noScripts);
             if (noComments != null) options.put("removeComments", noComments);
             if (normalize != null) options.put("normalizeWhitespace", normalize);
+            if (format != null) options.put("format", format);
+            if (attributes != null) options.put("attributes", attributes);
+            if (includeText != null) options.put("includeText", includeText);
 
             ExtractionRequest request = new ExtractionRequest(
                     url,
