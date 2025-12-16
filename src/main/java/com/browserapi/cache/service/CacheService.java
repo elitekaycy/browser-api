@@ -292,6 +292,28 @@ public class CacheService {
         return metadata;
     }
 
+    /**
+     * Gets cache key for a request without checking cache.
+     * Useful for cache info in API responses.
+     *
+     * @param request extraction request
+     * @return MD5 cache key
+     */
+    public String getCacheKey(ExtractionRequest request) {
+        return CacheKeyGenerator.generate(request);
+    }
+
+    /**
+     * Calculates expiration time for a request based on TTL.
+     *
+     * @param request extraction request
+     * @return calculated expiration timestamp
+     */
+    public LocalDateTime calculateExpiresAt(ExtractionRequest request) {
+        int ttlSeconds = cacheConfig.getTtlForType(request.type().name());
+        return LocalDateTime.now().plusSeconds(ttlSeconds);
+    }
+
     private String escapeJson(String value) {
         if (value == null) {
             return "";
