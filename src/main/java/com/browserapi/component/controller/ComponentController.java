@@ -1,7 +1,6 @@
 package com.browserapi.component.controller;
 
-import com.browserapi.component.model.CompleteComponent;
-import com.browserapi.component.model.ExtractionOptions;
+import com.browserapi.component.model.*;
 import com.browserapi.component.service.ComponentExtractor;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -169,6 +168,61 @@ public class ComponentController {
             return ResponseEntity
                     .internalServerError()
                     .body(Map.of("error", "Component extraction failed", "message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/extract/batch")
+    @Operation(
+            summary = "Extract multiple components in a single batch",
+            description = """
+                    Extracts multiple components from a single page using one browser session.
+                    This is much more efficient than making multiple separate requests.
+
+                    Features:
+                    - Single browser session for all components
+                    - Extract multiple matching elements per selector
+                    - Individual options per component
+                    - Global default options
+                    - Detailed success/failure per component
+
+                    Example request:
+                    {
+                      "url": "https://example.com",
+                      "components": [
+                        {
+                          "name": "header",
+                          "selector": "header",
+                          "options": { "scopeCSS": true }
+                        },
+                        {
+                          "name": "cards",
+                          "selector": ".card",
+                          "multiple": true
+                        }
+                      ],
+                      "globalOptions": {
+                        "scopeCSS": true,
+                        "encapsulateJS": true,
+                        "inlineAssets": true
+                      }
+                    }
+
+                    Returns array of components with success status for each.
+                    """
+    )
+    public ResponseEntity<?> extractBatch(@RequestBody BatchExtractionRequest request) {
+        log.info("Batch extraction request: url={}, components={}",
+                request.url(), request.components().size());
+
+        try {
+            BatchExtractionResult result = componentExtractor.extractBatch(request);
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            log.error("Batch extraction failed: url={}", request.url(), e);
+            return ResponseEntity
+                    .internalServerError()
+                    .body(Map.of("error", "Batch extraction failed", "message", e.getMessage()));
         }
     }
 

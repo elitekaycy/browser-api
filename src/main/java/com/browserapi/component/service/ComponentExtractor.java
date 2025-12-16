@@ -7,6 +7,7 @@ import com.browserapi.asset.service.AssetInliner;
 import com.browserapi.browser.BrowserManager;
 import com.browserapi.browser.PageSession;
 import com.browserapi.component.model.*;
+import com.microsoft.playwright.Locator;
 import com.browserapi.css.model.CSSCollectionResult;
 import com.browserapi.css.model.ScopedCSSResult;
 import com.browserapi.css.service.CSSCollector;
@@ -213,6 +214,267 @@ public class ComponentExtractor {
                 }
             }
         }
+    }
+
+    /**
+     * Extracts multiple components in a single batch operation.
+     * Uses one browser session for all extractions.
+     *
+     * @param request batch extraction request
+     * @return batch result with all components
+     */
+    public BatchExtractionResult extractBatch(BatchExtractionRequest request) {
+        log.info("Batch extraction request: url={}, components={}",
+                request.url(), request.components().size());
+
+        long startTime = System.currentTimeMillis();
+        List<BatchComponentResult> results = new ArrayList<>();
+        PageSession session = null;
+
+        try {
+            // Create single browser session for all extractions
+            ExtractionOptions globalOptions = request.globalOptions() != null
+                    ? request.globalOptions()
+                    : ExtractionOptions.defaults();
+
+            session = browserManager.createSession(request.url(), globalOptions.waitStrategy());
+
+            // Extract each component
+            for (BatchComponentRequest componentRequest : request.components()) {
+                try {
+                    // Merge global and component-specific options
+                    ExtractionOptions options = mergeOptions(globalOptions, componentRequest.options());
+
+                    if (componentRequest.multiple()) {
+                        // Extract all matching elements
+                        results.add(extractMultipleComponents(
+                                session,
+                                request.url(),
+                                componentRequest,
+                                options
+                        ));
+                    } else {
+                        // Extract single component
+                        CompleteComponent component = extractSingle(
+                                session,
+                                request.url(),
+                                componentRequest.selector(),
+                                options
+                        );
+                        results.add(BatchComponentResult.single(
+                                componentRequest.name(),
+                                componentRequest.selector(),
+                                component
+                        ));
+                    }
+
+                    log.debug("Extracted component: name={}, selector={}",
+                            componentRequest.name(), componentRequest.selector());
+
+                } catch (Exception e) {
+                    log.error("Failed to extract component: name={}, selector={}",
+                            componentRequest.name(), componentRequest.selector(), e);
+                    results.add(BatchComponentResult.failed(
+                            componentRequest.name(),
+                            componentRequest.selector(),
+                            e.getMessage()
+                    ));
+                }
+            }
+
+            long totalTime = System.currentTimeMillis() - startTime;
+            log.info("Batch extraction completed: total={}, successful={}, failed={}, timeMs={}",
+                    results.size(),
+                    results.stream().filter(BatchComponentResult::success).count(),
+                    results.stream().filter(r -> !r.success()).count(),
+                    totalTime);
+
+            return BatchExtractionResult.from(results, totalTime);
+
+        } finally {
+            if (session != null) {
+                try {
+                    browserManager.closeSession(session.sessionId());
+                } catch (Exception e) {
+                    log.warn("Failed to close session", e);
+                }
+            }
+        }
+    }
+
+    /**
+     * Extracts a single component using an existing session.
+     */
+    private CompleteComponent extractSingle(
+            PageSession session,
+            String url,
+            String selector,
+            ExtractionOptions options
+    ) {
+        // Similar to extract() but uses existing session
+        // Step 1: Extract HTML
+        ExtractionRequest htmlRequest = new ExtractionRequest(url, ExtractionType.HTML, selector, options.waitStrategy());
+        ExtractionResponse htmlResult = extractionService.extract(htmlRequest);
+        String html = htmlResult.data();
+        int htmlElements = countElements(html);
+
+        // Step 2: Collect CSS
+        CSSCollectionResult cssResult = cssCollector.collect(session, selector);
+        String css = cssResult.toCSS();
+        int cssRules = cssResult.deduplicatedRules();
+
+        // Step 3: Collect JavaScript
+        JavaScriptCollectionResult jsResult = jsCollector.collect(session, selector);
+        String javascript = buildJavaScriptCode(jsResult);
+
+        // Step 4: Detect and download assets
+        List<Asset> assets = assetDetector.detectAssets(session, selector);
+        List<Asset> downloadedAssets = new ArrayList<>();
+
+        if (options.inlineAssets() && !assets.isEmpty()) {
+            for (Asset asset : assets) {
+                if (options.assetTypes() != null &&
+                    !options.assetTypes().isEmpty() &&
+                    !options.assetTypes().contains(asset.type())) {
+                    continue;
+                }
+
+                Asset downloaded = options.maxAssetSize() != null
+                        ? assetDownloader.downloadAsset(session, asset, options.maxAssetSize())
+                        : assetDownloader.downloadAsset(session, asset);
+
+                if (downloaded.hasData()) {
+                    downloadedAssets.add(downloaded);
+                }
+            }
+        }
+
+        // Step 5: Inline assets
+        if (options.inlineAssets() && !downloadedAssets.isEmpty()) {
+            var inlinedResult = assetInliner.inline(html, css, downloadedAssets);
+            html = inlinedResult.inlinedHtml();
+            css = inlinedResult.inlinedCss();
+        }
+
+        // Step 6: Scope CSS
+        String namespace = options.customNamespace();
+        if (options.scopeCSS() && cssResult != null && cssResult.totalRules() > 0) {
+            ScopedCSSResult scopedResult = cssScoper.scope(cssResult, namespace);
+            css = scopedResult.scopedCSS();
+            namespace = scopedResult.namespace();
+        } else {
+            namespace = namespace != null ? namespace : cssScoper.generateNamespace();
+        }
+
+        // Step 7: Encapsulate JavaScript
+        if (options.encapsulateJS() && javascript != null && !javascript.isBlank()) {
+            EncapsulatedJavaScript encapsulated = jsEncapsulator.encapsulate(
+                    javascript,
+                    "rootElement",
+                    options.jsEncapsulationType()
+            );
+            javascript = encapsulated.encapsulatedCode();
+        }
+
+        // Build result
+        long originalSize = html.length() + css.length() + javascript.length();
+        long finalSize = html.length() + css.length() + javascript.length();
+
+        ComponentMetadata metadata = new ComponentMetadata(
+                url,
+                selector,
+                downloadedAssets.size(),
+                downloadedAssets.stream()
+                        .filter(a -> a.size() != null)
+                        .mapToLong(Asset::size)
+                        .sum(),
+                options
+        );
+
+        ExtractionStatistics statistics = new ExtractionStatistics(
+                htmlElements,
+                cssRules,
+                jsResult.totalListeners(),
+                jsResult.totalHandlers(),
+                jsResult.totalInlineScripts(),
+                jsResult.totalExternalScripts(),
+                downloadedAssets.size(),
+                0,
+                originalSize,
+                finalSize
+        );
+
+        return new CompleteComponent(html, css, javascript, namespace, metadata, statistics);
+    }
+
+    /**
+     * Extracts multiple matching components.
+     */
+    private BatchComponentResult extractMultipleComponents(
+            PageSession session,
+            String url,
+            BatchComponentRequest request,
+            ExtractionOptions options
+    ) {
+        try {
+            // Get count of matching elements
+            int count = session.page().locator(request.selector()).count();
+
+            if (count == 0) {
+                return BatchComponentResult.failed(
+                        request.name(),
+                        request.selector(),
+                        "No elements found"
+                );
+            }
+
+            List<CompleteComponent> components = new ArrayList<>();
+
+            // Extract each matching element
+            for (int i = 0; i < count; i++) {
+                // Use nth-of-type to target the i-th matching element
+                String indexedSelector = request.selector() + ":nth-of-type(" + (i + 1) + ")";
+                try {
+                    CompleteComponent component = extractSingle(session, url, indexedSelector, options);
+                    components.add(component);
+                } catch (Exception e) {
+                    log.warn("Failed to extract element {} of {}: {}", i + 1, count, e.getMessage());
+                }
+            }
+
+            return BatchComponentResult.multiple(
+                    request.name(),
+                    request.selector(),
+                    components
+            );
+
+        } catch (Exception e) {
+            return BatchComponentResult.failed(
+                    request.name(),
+                    request.selector(),
+                    e.getMessage()
+            );
+        }
+    }
+
+    /**
+     * Merges global options with component-specific options.
+     */
+    private ExtractionOptions mergeOptions(ExtractionOptions global, ExtractionOptions component) {
+        if (component == null) {
+            return global;
+        }
+
+        return new ExtractionOptions(
+                component.scopeCSS(),
+                component.encapsulateJS(),
+                component.inlineAssets(),
+                component.maxAssetSize() != null ? component.maxAssetSize() : global.maxAssetSize(),
+                component.assetTypes() != null ? component.assetTypes() : global.assetTypes(),
+                component.customNamespace() != null ? component.customNamespace() : global.customNamespace(),
+                component.waitStrategy() != null ? component.waitStrategy() : global.waitStrategy(),
+                component.jsEncapsulationType() != null ? component.jsEncapsulationType() : global.jsEncapsulationType()
+        );
     }
 
     /**
