@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Orchestrates all extraction utilities to create complete, self-contained components.
@@ -44,6 +45,7 @@ public class ComponentExtractor {
     private final AssetDetector assetDetector;
     private final AssetDownloader assetDownloader;
     private final AssetInliner assetInliner;
+    private final ComponentCacheService cacheService;
 
     public ComponentExtractor(
             BrowserManager browserManager,
@@ -54,7 +56,8 @@ public class ComponentExtractor {
             JavaScriptEncapsulator jsEncapsulator,
             AssetDetector assetDetector,
             AssetDownloader assetDownloader,
-            AssetInliner assetInliner
+            AssetInliner assetInliner,
+            ComponentCacheService cacheService
     ) {
         this.browserManager = browserManager;
         this.extractionService = extractionService;
@@ -65,6 +68,7 @@ public class ComponentExtractor {
         this.assetDetector = assetDetector;
         this.assetDownloader = assetDownloader;
         this.assetInliner = assetInliner;
+        this.cacheService = cacheService;
     }
 
     /**
@@ -77,6 +81,14 @@ public class ComponentExtractor {
      */
     public CompleteComponent extract(String url, String selector, ExtractionOptions options) {
         log.info("Extracting complete component: url={}, selector={}", url, selector);
+
+        // Check cache first
+        String cacheKey = cacheService.generateCacheKey(url, selector, options, "JSON");
+        Optional<CompleteComponent> cached = cacheService.getComponent(cacheKey);
+        if (cached.isPresent()) {
+            log.info("Returning cached component: url={}, selector={}", url, selector);
+            return cached.get();
+        }
 
         PageSession session = null;
         try {
@@ -198,6 +210,9 @@ public class ComponentExtractor {
 
             log.info("Component extraction completed: namespace={}, htmlElements={}, cssRules={}, assets={}",
                     namespace, htmlElements, cssRules, downloadedAssets.size());
+
+            // Store in cache
+            cacheService.putComponent(url, selector, options, component);
 
             return component;
 

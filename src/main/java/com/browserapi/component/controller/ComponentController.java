@@ -1,6 +1,7 @@
 package com.browserapi.component.controller;
 
 import com.browserapi.component.model.*;
+import com.browserapi.component.service.ComponentCacheService;
 import com.browserapi.component.service.ComponentExtractor;
 import com.browserapi.component.service.ComponentExporter;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * REST API controller for complete component extraction.
@@ -26,10 +28,14 @@ public class ComponentController {
 
     private final ComponentExtractor componentExtractor;
     private final ComponentExporter componentExporter;
+    private final ComponentCacheService cacheService;
 
-    public ComponentController(ComponentExtractor componentExtractor, ComponentExporter componentExporter) {
+    public ComponentController(ComponentExtractor componentExtractor,
+                              ComponentExporter componentExporter,
+                              ComponentCacheService cacheService) {
         this.componentExtractor = componentExtractor;
         this.componentExporter = componentExporter;
+        this.cacheService = cacheService;
     }
 
     @PostMapping("/extract")
@@ -270,6 +276,15 @@ public class ComponentController {
             ExtractionOptions options = request.options() != null
                     ? request.options()
                     : ExtractionOptions.defaults();
+            ExportFormat format = request.format() != null ? request.format() : ExportFormat.JSON;
+
+            // Check cache for export
+            String cacheKey = cacheService.generateCacheKey(request.url(), request.selector(), options, format.name());
+            Optional<ComponentExport> cachedExport = cacheService.getExport(cacheKey);
+            if (cachedExport.isPresent()) {
+                log.info("Returning cached export: url={}, format={}", request.url(), format);
+                return ResponseEntity.ok(cachedExport.get());
+            }
 
             // Extract complete component
             CompleteComponent component = componentExtractor.extract(
@@ -279,8 +294,10 @@ public class ComponentController {
             );
 
             // Export to requested format
-            ExportFormat format = request.format() != null ? request.format() : ExportFormat.JSON;
             ComponentExport export = componentExporter.export(component, format);
+
+            // Store export in cache
+            cacheService.putExport(request.url(), request.selector(), options, format, export);
 
             return ResponseEntity.ok(export);
 
@@ -312,17 +329,30 @@ public class ComponentController {
             ExtractionOptions options = request.options() != null
                     ? request.options()
                     : ExtractionOptions.defaults();
-
-            // Extract complete component
-            CompleteComponent component = componentExtractor.extract(
-                    request.url(),
-                    request.selector(),
-                    options
-            );
-
-            // Export to requested format
             ExportFormat format = request.format() != null ? request.format() : ExportFormat.HTML;
-            ComponentExport export = componentExporter.export(component, format);
+
+            // Check cache for export
+            String cacheKey = cacheService.generateCacheKey(request.url(), request.selector(), options, format.name());
+            Optional<ComponentExport> cachedExport = cacheService.getExport(cacheKey);
+
+            ComponentExport export;
+            if (cachedExport.isPresent()) {
+                log.info("Returning cached export download: url={}, format={}", request.url(), format);
+                export = cachedExport.get();
+            } else {
+                // Extract complete component
+                CompleteComponent component = componentExtractor.extract(
+                        request.url(),
+                        request.selector(),
+                        options
+                );
+
+                // Export to requested format
+                export = componentExporter.export(component, format);
+
+                // Store export in cache
+                cacheService.putExport(request.url(), request.selector(), options, format, export);
+            }
 
             // Return main file as download
             String content = export.getMainContent();
