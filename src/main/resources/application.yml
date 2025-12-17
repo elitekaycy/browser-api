@@ -75,6 +75,11 @@ component:
     ttl: 3600           # 1 hour - components are expensive to extract
     max-size-bytes: 10485760  # 10MB - prevent storing huge components
 
+  hosting:
+    base-dir: ./hosted-components
+    base-url: /hosted
+    ttl-hours: 24       # Files expire after 24 hours
+
 logging:
   level:
     com.browserapi: INFO

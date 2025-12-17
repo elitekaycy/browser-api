@@ -1,9 +1,11 @@
 package com.browserapi.component.controller;
 
+import com.browserapi.component.entity.ComponentFile;
 import com.browserapi.component.model.*;
 import com.browserapi.component.service.ComponentCacheService;
 import com.browserapi.component.service.ComponentExtractor;
 import com.browserapi.component.service.ComponentExporter;
+import com.browserapi.component.service.ComponentHostingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
@@ -29,13 +31,16 @@ public class ComponentController {
     private final ComponentExtractor componentExtractor;
     private final ComponentExporter componentExporter;
     private final ComponentCacheService cacheService;
+    private final ComponentHostingService hostingService;
 
     public ComponentController(ComponentExtractor componentExtractor,
                               ComponentExporter componentExporter,
-                              ComponentCacheService cacheService) {
+                              ComponentCacheService cacheService,
+                              ComponentHostingService hostingService) {
         this.componentExtractor = componentExtractor;
         this.componentExporter = componentExporter;
         this.cacheService = cacheService;
+        this.hostingService = hostingService;
     }
 
     @PostMapping("/extract")
@@ -368,6 +373,76 @@ public class ComponentController {
             log.error("Component export download failed: url={}, selector={}, format={}",
                     request.url(), request.selector(), request.format(), e);
             return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PostMapping("/host")
+    @Operation(
+            summary = "Host a component as a static HTML file",
+            description = """
+                    Extracts a component and saves it as a static HTML file with a unique shareable URL.
+
+                    Features:
+                    - Unique URL for easy sharing (e.g., /hosted/abc123.html)
+                    - Auto-expiration after 24 hours (configurable)
+                    - View count tracking
+                    - Self-contained HTML file (no external dependencies)
+
+                    Example request:
+                    {
+                      "url": "https://example.com",
+                      "selector": ".hero",
+                      "options": {
+                        "scopeCSS": true,
+                        "encapsulateJS": true,
+                        "inlineAssets": true
+                      }
+                    }
+
+                    Returns:
+                    - fileId: Unique identifier for the hosted file
+                    - publicUrl: URL to access the file (e.g., /hosted/abc123.html)
+                    - fileSizeBytes: Size of the hosted HTML file
+                    - expiresAt: When the file will be automatically deleted
+                    """
+    )
+    public ResponseEntity<?> hostComponent(@RequestBody ExtractionRequest request) {
+        log.info("Component hosting request: url={}, selector={}",
+                request.url(), request.selector());
+
+        try {
+            ExtractionOptions options = request.options() != null
+                    ? request.options()
+                    : ExtractionOptions.defaults();
+
+            // Extract complete component
+            CompleteComponent component = componentExtractor.extract(
+                    request.url(),
+                    request.selector(),
+                    options
+            );
+
+            // Host the component
+            ComponentFile hostedFile = hostingService.hostComponent(
+                    request.url(),
+                    request.selector(),
+                    component
+            );
+
+            return ResponseEntity.ok(Map.of(
+                    "fileId", hostedFile.getFileId(),
+                    "publicUrl", hostedFile.getPublicUrl(),
+                    "fileSizeBytes", hostedFile.getFileSizeBytes(),
+                    "expiresAt", hostedFile.getExpiresAt(),
+                    "namespace", hostedFile.getNamespace()
+            ));
+
+        } catch (Exception e) {
+            log.error("Component hosting failed: url={}, selector={}",
+                    request.url(), request.selector(), e);
+            return ResponseEntity
+                    .internalServerError()
+                    .body(Map.of("error", "Component hosting failed", "message", e.getMessage()));
         }
     }
 
