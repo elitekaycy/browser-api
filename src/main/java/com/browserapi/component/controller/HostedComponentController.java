@@ -16,9 +16,11 @@ import java.util.Optional;
 /**
  * Controller for serving hosted component files.
  * Handles GET requests to publicly accessible component URLs.
+ * CORS enabled to allow iframe embedding from any origin.
  */
 @RestController
 @RequestMapping("/hosted")
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 @Tag(name = "Hosted Components", description = "Access hosted component files")
 public class HostedComponentController {
 
@@ -64,6 +66,8 @@ public class HostedComponentController {
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_HTML_VALUE)
                     .header(HttpHeaders.CACHE_CONTROL, "public, max-age=3600") // Cache for 1 hour
+                    .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*") // Allow CORS
+                    .header("X-Frame-Options", "ALLOWALL") // Allow iframe embedding
                     .body(htmlContent);
 
         } catch (Exception e) {

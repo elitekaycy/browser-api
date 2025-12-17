@@ -6,6 +6,7 @@ import com.browserapi.component.service.ComponentCacheService;
 import com.browserapi.component.service.ComponentExtractor;
 import com.browserapi.component.service.ComponentExporter;
 import com.browserapi.component.service.ComponentHostingService;
+import com.browserapi.component.service.IframeEmbedService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
@@ -32,15 +33,18 @@ public class ComponentController {
     private final ComponentExporter componentExporter;
     private final ComponentCacheService cacheService;
     private final ComponentHostingService hostingService;
+    private final IframeEmbedService embedService;
 
     public ComponentController(ComponentExtractor componentExtractor,
                               ComponentExporter componentExporter,
                               ComponentCacheService cacheService,
-                              ComponentHostingService hostingService) {
+                              ComponentHostingService hostingService,
+                              IframeEmbedService embedService) {
         this.componentExtractor = componentExtractor;
         this.componentExporter = componentExporter;
         this.cacheService = cacheService;
         this.hostingService = hostingService;
+        this.embedService = embedService;
     }
 
     @PostMapping("/extract")
@@ -384,9 +388,11 @@ public class ComponentController {
 
                     Features:
                     - Unique URL for easy sharing (e.g., /hosted/abc123.html)
+                    - Ready-to-use iframe embed codes (fixed, responsive, minimal)
                     - Auto-expiration after 24 hours (configurable)
                     - View count tracking
                     - Self-contained HTML file (no external dependencies)
+                    - Sandbox security for iframe embedding
 
                     Example request:
                     {
@@ -404,6 +410,13 @@ public class ComponentController {
                     - publicUrl: URL to access the file (e.g., /hosted/abc123.html)
                     - fileSizeBytes: Size of the hosted HTML file
                     - expiresAt: When the file will be automatically deleted
+                    - embedCodes: Ready-to-use iframe codes (fixed, responsive, minimal)
+                    - usage: Instructions for each embed code type
+
+                    Embed Codes:
+                    - fixed: 800x600px iframe, good for sidebars
+                    - responsive: Auto-sizing iframe with 16:9 aspect ratio, best for mobile
+                    - minimal: Bare iframe tag, you control all styling
                     """
     )
     public ResponseEntity<?> hostComponent(@RequestBody ExtractionRequest request) {
@@ -429,12 +442,24 @@ public class ComponentController {
                     component
             );
 
+            // Generate embed codes
+            EmbedCode embedCodes = embedService.generateEmbedCodes(
+                    hostedFile.getFileId(),
+                    hostedFile.getPublicUrl()
+            );
+
             return ResponseEntity.ok(Map.of(
                     "fileId", hostedFile.getFileId(),
                     "publicUrl", hostedFile.getPublicUrl(),
                     "fileSizeBytes", hostedFile.getFileSizeBytes(),
                     "expiresAt", hostedFile.getExpiresAt(),
-                    "namespace", hostedFile.getNamespace()
+                    "namespace", hostedFile.getNamespace(),
+                    "embedCodes", Map.of(
+                            "fixed", embedCodes.fixed(),
+                            "responsive", embedCodes.responsive(),
+                            "minimal", embedCodes.minimal()
+                    ),
+                    "usage", embedCodes.usage()
             ));
 
         } catch (Exception e) {
