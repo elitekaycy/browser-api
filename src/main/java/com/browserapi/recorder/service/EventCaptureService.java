@@ -40,13 +40,23 @@ public class EventCaptureService {
     private final BrowserManager browserManager;
 
     /**
+     * Recorder session manager for storing captured actions.
+     */
+    private final RecorderSessionManager sessionManager;
+
+    /**
      * Track which sessions have event capture enabled.
      */
     private final Map<UUID, Boolean> captureEnabled;
 
-    public EventCaptureService(SimpMessagingTemplate messagingTemplate, BrowserManager browserManager) {
+    public EventCaptureService(
+            SimpMessagingTemplate messagingTemplate,
+            BrowserManager browserManager,
+            RecorderSessionManager sessionManager
+    ) {
         this.messagingTemplate = messagingTemplate;
         this.browserManager = browserManager;
+        this.sessionManager = sessionManager;
         this.captureEnabled = new ConcurrentHashMap<>();
     }
 
@@ -119,6 +129,12 @@ public class EventCaptureService {
             Action action = convertToAction(type, selector, value);
 
             if (action != null) {
+                // Store action in recorder session
+                sessionManager.getSession(sessionId).ifPresent(session -> {
+                    session.addAction(action);
+                    log.debug("Action added to session: {}", action);
+                });
+
                 // Broadcast via WebSocket
                 String destination = "/topic/recorder/" + sessionId + "/actions";
                 messagingTemplate.convertAndSend(destination, action);
