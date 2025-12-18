@@ -27,7 +27,6 @@ import java.util.UUID;
  * - REST API for session management and recording control
  */
 @Controller
-@RequestMapping("/recorder")
 @Tag(name = "Recorder", description = "Browser action recorder with real-time streaming")
 public class RecorderController {
 
@@ -53,7 +52,7 @@ public class RecorderController {
      * @param model Spring MVC model for passing data to view
      * @return Thymeleaf template name
      */
-    @GetMapping
+    @GetMapping("/recorder")
     public String recorderPage(Model model) {
         model.addAttribute("appName", "Browser Action Recorder");
         model.addAttribute("version", "1.0.0");
