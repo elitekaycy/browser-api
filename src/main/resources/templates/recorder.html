@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title th:text="${appName}">Browser Action Recorder</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2/lib/stomp.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         body {
@@ -41,7 +43,7 @@
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <button id="record-btn" class="px-4 py-1.5 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                <button id="record-btn" disabled class="px-4 py-1.5 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:bg-gray-300 disabled:cursor-not-allowed">
                     <span class="flex items-center gap-2">
                         <span id="record-indicator" class="w-2 h-2 rounded-full bg-white"></span>
                         <span id="record-text">Start Recording</span>
@@ -104,16 +106,19 @@
         <div class="flex-1 flex flex-col bg-white">
             <!-- Browser Info Bar -->
             <div class="px-4 py-2 border-b border-gray-200 bg-gray-50">
-                <div class="flex items-center gap-2 text-xs text-gray-500">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span id="page-status">Click "Load" to open URL in recorder</span>
+                <div class="flex items-center justify-between text-xs text-gray-500">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span id="page-status">Click "Load" to open URL in recorder</span>
+                    </div>
+                    <span id="fps-counter" class="hidden">FPS: <span id="fps-value">0</span></span>
                 </div>
             </div>
 
             <!-- Browser Content -->
-            <div class="flex-1 relative bg-white">
+            <div class="flex-1 relative bg-black">
                 <div id="browser-placeholder" class="absolute inset-0 flex items-center justify-center text-gray-400">
                     <div class="text-center">
                         <svg class="mx-auto h-16 w-16 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -123,11 +128,10 @@
                         <p class="mt-1 text-xs text-gray-400">Enter a URL and click Load</p>
                     </div>
                 </div>
-                <iframe
-                    id="browser-frame"
-                    class="hidden w-full h-full border-0"
-                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-                ></iframe>
+                <canvas
+                    id="stream-canvas"
+                    class="hidden w-full h-full object-contain"
+                ></canvas>
             </div>
         </div>
     </div>
@@ -139,6 +143,11 @@
         let sessionId = null;
         let isRecording = false;
         let actions = [];
+        let stompClient = null;
+        let canvas = null;
+        let ctx = null;
+        let frameCount = 0;
+        let lastFpsUpdate = Date.now();
 
         const urlInput = document.getElementById('url-input');
         const loadBtn = document.getElementById('load-btn');
@@ -148,13 +157,19 @@
         const actionsList = document.getElementById('actions-list');
         const actionCount = document.getElementById('action-count');
         const emptyState = document.getElementById('empty-state');
-        const browserFrame = document.getElementById('browser-frame');
+        const streamCanvas = document.getElementById('stream-canvas');
         const browserPlaceholder = document.getElementById('browser-placeholder');
         const pageStatus = document.getElementById('page-status');
+        const fpsCounter = document.getElementById('fps-counter');
+        const fpsValue = document.getElementById('fps-value');
         const clearBtn = document.getElementById('clear-btn');
         const saveWorkflowBtn = document.getElementById('save-workflow-btn');
         const exportJsonBtn = document.getElementById('export-json-btn');
         const copyBtn = document.getElementById('copy-btn');
+
+        // Initialize canvas
+        canvas = streamCanvas;
+        ctx = canvas.getContext('2d');
 
         // Event Listeners
         loadBtn.addEventListener('click', loadPage);
@@ -172,19 +187,94 @@
             }
 
             try {
-                // TODO: Call backend to start browser session (Ticket #033)
-                // For now, load in iframe (limited due to CORS)
-                browserFrame.src = url;
-                browserFrame.classList.remove('hidden');
-                browserPlaceholder.classList.add('hidden');
-                pageStatus.textContent = `Loaded: ${url}`;
+                loadBtn.disabled = true;
+                loadBtn.textContent = 'Loading...';
+                pageStatus.textContent = 'Creating browser session...';
 
-                // Note: Real implementation will use backend browser session
-                console.log('Note: Full recording will be implemented in Ticket #033');
+                // Create recorder session
+                const response = await fetch(`${API_BASE_URL}/recorder/sessions`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ url: url, frameRate: 5 })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to create session');
+                }
+
+                const data = await response.json();
+                sessionId = data.sessionId;
+
+                // Connect to WebSocket
+                await connectWebSocket();
+
+                // Show canvas
+                browserPlaceholder.classList.add('hidden');
+                streamCanvas.classList.remove('hidden');
+
+                pageStatus.textContent = `Loaded: ${url}`;
+                recordBtn.disabled = false;
+
+                console.log('Session created:', sessionId);
+
             } catch (error) {
                 console.error('Failed to load page:', error);
                 alert('Failed to load page: ' + error.message);
+                pageStatus.textContent = 'Failed to load page';
+            } finally {
+                loadBtn.disabled = false;
+                loadBtn.textContent = 'Load';
             }
+        }
+
+        async function connectWebSocket() {
+            return new Promise((resolve, reject) => {
+                const socket = new SockJS('/ws-recorder');
+                stompClient = Stomp.over(socket);
+
+                stompClient.connect({}, function(frame) {
+                    console.log('WebSocket connected:', frame);
+
+                    // Subscribe to frame stream
+                    stompClient.subscribe(`/topic/recorder/${sessionId}/frames`, function(message) {
+                        const frameData = JSON.parse(message.body);
+                        renderFrame(frameData);
+                    });
+
+                    // Subscribe to action stream
+                    stompClient.subscribe(`/topic/recorder/${sessionId}/actions`, function(message) {
+                        const action = JSON.parse(message.body);
+                        addAction(action);
+                    });
+
+                    resolve();
+                }, function(error) {
+                    console.error('WebSocket connection error:', error);
+                    reject(error);
+                });
+            });
+        }
+
+        function renderFrame(frameData) {
+            const img = new Image();
+            img.onload = function() {
+                // Resize canvas to match image
+                canvas.width = img.width;
+                canvas.height = img.height;
+
+                // Draw image
+                ctx.drawImage(img, 0, 0);
+
+                // Update FPS counter
+                frameCount++;
+                const now = Date.now();
+                if (now - lastFpsUpdate >= 1000) {
+                    fpsValue.textContent = frameCount;
+                    frameCount = 0;
+                    lastFpsUpdate = now;
+                }
+            };
+            img.src = 'data:image/png;base64,' + frameData.imageData;
         }
 
         async function toggleRecording() {
@@ -197,8 +287,17 @@
 
         async function startRecording() {
             try {
-                // TODO: Call backend API to start recording (Ticket #033)
-                sessionId = 'session-' + Date.now();
+                recordBtn.disabled = true;
+
+                // Start recording on backend
+                const response = await fetch(`${API_BASE_URL}/recorder/sessions/${sessionId}/start`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to start recording');
+                }
+
                 isRecording = true;
 
                 recordBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
@@ -207,21 +306,33 @@
                 recordIndicator.classList.add('recording-indicator');
                 urlInput.disabled = true;
                 loadBtn.disabled = true;
+                fpsCounter.classList.remove('hidden');
 
                 pageStatus.textContent = 'Recording actions...';
-
-                // TODO: Initialize event capture script (Ticket #034)
-                console.log('Recording started - event capture will be implemented in Ticket #034');
+                console.log('Recording started');
 
             } catch (error) {
                 console.error('Failed to start recording:', error);
                 alert('Failed to start recording: ' + error.message);
+            } finally {
+                recordBtn.disabled = false;
             }
         }
 
         async function stopRecording() {
             try {
-                // TODO: Call backend API to stop recording (Ticket #033)
+                recordBtn.disabled = true;
+
+                // Stop recording on backend
+                const response = await fetch(`${API_BASE_URL}/recorder/sessions/${sessionId}/stop`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to stop recording');
+                }
+
+                const data = await response.json();
                 isRecording = false;
 
                 recordBtn.classList.remove('bg-gray-700', 'hover:bg-gray-800');
@@ -230,17 +341,22 @@
                 recordIndicator.classList.remove('recording-indicator');
                 urlInput.disabled = false;
                 loadBtn.disabled = false;
+                fpsCounter.classList.add('hidden');
 
-                pageStatus.textContent = 'Recording stopped';
+                pageStatus.textContent = `Recording stopped (${data.actionCount} actions)`;
                 updateExportButtons();
+                console.log('Recording stopped');
 
             } catch (error) {
                 console.error('Failed to stop recording:', error);
                 alert('Failed to stop recording: ' + error.message);
+            } finally {
+                recordBtn.disabled = false;
             }
         }
 
         function addAction(action) {
+            const emptyState = document.getElementById('empty-state');
             if (emptyState) {
                 emptyState.remove();
             }
@@ -248,36 +364,35 @@
             actions.push(action);
 
             const actionEl = document.createElement('div');
-            actionEl.className = 'px-4 py-3 hover:bg-gray-50 cursor-pointer group';
+            actionEl.className = 'px-4 py-3 hover:bg-gray-50 border-l-2 border-blue-500 bg-blue-50 transition-all duration-300';
             actionEl.innerHTML = `
                 <div class="flex items-start gap-3">
                     <span class="flex-shrink-0 w-5 h-5 flex items-center justify-center text-xs font-medium text-gray-400">
-                        ${action.id}
+                        ${actions.length}
                     </span>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2">
                             <span class="text-xs font-medium text-gray-900">${action.type}</span>
-                            ${action.value ? `<span class="text-xs text-gray-400">→</span>` : ''}
                         </div>
                         <div class="mt-0.5 text-xs font-mono text-gray-500 truncate">${action.selector}</div>
                         ${action.value ? `<div class="mt-0.5 text-xs text-gray-600">"${action.value}"</div>` : ''}
                     </div>
-                    <button onclick="deleteAction(${action.id})" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
                 </div>
             `;
 
             actionsList.appendChild(actionEl);
+
+            // Fade out highlight after 1 second
+            setTimeout(() => {
+                actionEl.classList.remove('border-blue-500', 'bg-blue-50');
+                actionEl.classList.add('border-transparent');
+            }, 1000);
+
             updateActionCount();
             updateExportButtons();
-        }
 
-        function deleteAction(actionId) {
-            actions = actions.filter(a => a.id !== actionId);
-            renderActions();
+            // Auto scroll to bottom
+            actionEl.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
 
         function clearActions() {
@@ -300,8 +415,6 @@
                         <p class="mt-1 text-xs text-gray-400">Load a page and start recording</p>
                     </div>
                 `;
-            } else {
-                actions.forEach(action => addAction(action));
             }
             updateActionCount();
             updateExportButtons();
@@ -325,7 +438,6 @@
             if (!workflowName) return;
 
             try {
-                // TODO: Call workflow API (Ticket #036)
                 const response = await fetch(`${API_BASE_URL}/workflows`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -333,7 +445,8 @@
                         name: workflowName,
                         url: urlInput.value,
                         actions: actions,
-                        tags: ['recorded']
+                        tags: ['recorded'],
+                        createdBy: 'recorder'
                     })
                 });
 
@@ -342,7 +455,8 @@
                     alert(`Workflow "${workflowName}" saved successfully!`);
                     clearActions();
                 } else {
-                    alert('Failed to save workflow');
+                    const error = await response.json();
+                    alert('Failed to save workflow: ' + (error.message || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Save workflow error:', error);
@@ -363,7 +477,6 @@
             const json = JSON.stringify(actions, null, 2);
             try {
                 await navigator.clipboard.writeText(json);
-                // Show brief success feedback
                 const originalText = copyBtn.textContent;
                 copyBtn.textContent = 'Copied!';
                 setTimeout(() => {
@@ -387,10 +500,13 @@
             URL.revokeObjectURL(url);
         }
 
-        // Listen for actions from injected script (will be implemented in Ticket #034)
-        window.addEventListener('message', (event) => {
-            if (event.data.type === 'RECORDER_ACTION' && isRecording) {
-                addAction(event.data.action);
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', async function() {
+            if (sessionId) {
+                // Close session
+                await fetch(`${API_BASE_URL}/recorder/sessions/${sessionId}`, {
+                    method: 'DELETE'
+                });
             }
         });
         /*]]>*/
