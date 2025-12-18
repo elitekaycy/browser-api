@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${appName}">Browser Action Recorder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes pulse-ring {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .pulse-ring {
+            animation: pulse-ring 2s infinite;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-purple-500 to-purple-800 min-h-screen p-4 md:p-8">
+    <div class="max-w-6xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-purple-600 to-purple-800 text-white p-8 text-center">
+            <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center justify-center gap-3">
+                <span>🎬</span>
+                <span th:text="${appName}">Browser Action Recorder</span>
+            </h1>
+            <p class="text-purple-100">Record browser interactions and export as automated workflows</p>
+        </div>
+
+        <div class="p-6 md:p-8">
+            <!-- URL Input Section -->
+            <div class="bg-gray-50 rounded-xl p-6 mb-6">
+                <label for="url-input" class="block font-semibold text-gray-700 mb-3">Enter URL to Record</label>
+                <div class="flex flex-col md:flex-row gap-3">
+                    <input
+                        type="url"
+                        id="url-input"
+                        class="flex-1 px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:outline-none transition-colors"
+                        placeholder="https://example.com"
+                        value="https://example.com"
+                    />
+                    <button id="start-btn" class="px-6 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-all hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                        <span>▶️</span>
+                        <span>Start Recording</span>
+                    </button>
+                    <button id="stop-btn" class="px-6 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-all hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2" disabled>
+                        <span>⏹️</span>
+                        <span>Stop Recording</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Status Indicator -->
+            <div class="flex items-center gap-3 p-4 bg-gray-100 rounded-lg mb-6">
+                <span id="status-indicator" class="w-3 h-3 rounded-full bg-gray-400"></span>
+                <span id="status-text" class="font-semibold text-gray-700">Not Recording</span>
+            </div>
+
+            <!-- Actions List -->
+            <div class="bg-gray-50 rounded-xl p-6 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">Recorded Actions</h3>
+                    <span class="bg-purple-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                        <span id="action-count">0</span>
+                    </span>
+                </div>
+                <ul id="actions-list" class="space-y-3 max-h-96 overflow-y-auto">
+                    <div class="text-center py-12 text-gray-400">
+                        <div class="text-6xl mb-4">📋</div>
+                        <p class="font-semibold">No actions recorded yet</p>
+                        <p class="text-sm mt-2">Start recording to capture browser interactions</p>
+                    </div>
+                </ul>
+            </div>
+
+            <!-- Export Buttons -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <button id="export-workflow-btn" onclick="exportAsWorkflow()" disabled class="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center gap-2 font-semibold">
+                    <span class="text-3xl">💾</span>
+                    <span>Save as Workflow</span>
+                </button>
+                <button id="export-json-btn" onclick="exportAsJSON()" disabled class="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center gap-2 font-semibold">
+                    <span class="text-3xl">📄</span>
+                    <span>Export as JSON</span>
+                </button>
+                <button id="export-playwright-btn" onclick="exportAsPlaywright()" disabled class="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center gap-2 font-semibold">
+                    <span class="text-3xl">🎭</span>
+                    <span>Export as Playwright</span>
+                </button>
+                <button id="copy-btn" onclick="copyToClipboard()" disabled class="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center gap-2 font-semibold">
+                    <span class="text-3xl">📋</span>
+                    <span>Copy to Clipboard</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="bg-gray-50 p-4 text-center text-gray-600 text-sm">
+            <p th:text="'Version ' + ${version} + ' • API: ' + ${apiBaseUrl}">Version 1.0.0 • API: /api/v1</p>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        const API_BASE_URL = /*[[${apiBaseUrl}]]*/ '/api/v1';
+
+        let sessionId = null;
+        let pollingInterval = null;
+        let actions = [];
+
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const urlInput = document.getElementById('url-input');
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusText = document.getElementById('status-text');
+        const actionsList = document.getElementById('actions-list');
+        const actionCount = document.getElementById('action-count');
+
+        startBtn.addEventListener('click', startRecording);
+        stopBtn.addEventListener('click', stopRecording);
+
+        async function startRecording() {
+            const url = urlInput.value.trim();
+            if (!url) {
+                alert('Please enter a valid URL');
+                return;
+            }
+
+            try {
+                sessionId = 'session-' + Date.now();
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                urlInput.disabled = true;
+                updateStatus('Recording', true);
+
+                // Demo actions
+                setTimeout(() => addSampleAction('FILL', '#username', 'admin'), 1000);
+                setTimeout(() => addSampleAction('FILL', '#password', '•••••••'), 2000);
+                setTimeout(() => addSampleAction('CLICK', '#login-btn', null), 3000);
+            } catch (error) {
+                console.error('Failed to start recording:', error);
+                alert('Failed to start recording: ' + error.message);
+            }
+        }
+
+        async function stopRecording() {
+            try {
+                if (pollingInterval) {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                }
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                urlInput.disabled = false;
+                updateStatus('Recording Stopped', false);
+                enableExportButtons();
+            } catch (error) {
+                console.error('Failed to stop recording:', error);
+                alert('Failed to stop recording: ' + error.message);
+            }
+        }
+
+        function updateStatus(text, isRecording) {
+            statusText.textContent = text;
+            if (isRecording) {
+                statusIndicator.className = 'w-3 h-3 rounded-full bg-red-500 pulse-ring';
+            } else {
+                statusIndicator.className = 'w-3 h-3 rounded-full bg-gray-400';
+            }
+        }
+
+        function addSampleAction(type, selector, value) {
+            const action = {
+                id: actions.length + 1,
+                type: type,
+                selector: selector,
+                value: value
+            };
+            actions.push(action);
+            addActionToList(action);
+        }
+
+        function addActionToList(action) {
+            const emptyState = actionsList.querySelector('div');
+            if (emptyState && emptyState.classList.contains('text-center')) {
+                emptyState.remove();
+            }
+
+            const li = document.createElement('li');
+            li.className = 'bg-white border border-gray-200 rounded-lg p-4 hover:border-purple-500 hover:shadow-md transition-all flex items-center gap-4';
+            li.innerHTML = `
+                <span class="flex-shrink-0 w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">${action.id}</span>
+                <span class="px-3 py-1 bg-purple-100 text-purple-700 rounded-md font-semibold text-sm">${action.type}</span>
+                <div class="flex-1 text-sm text-gray-600">
+                    <span class="font-mono font-medium text-gray-800">${action.selector}</span>
+                    ${action.value ? `<span class="text-green-600 font-medium"> → "${action.value}"</span>` : ''}
+                </div>
+                <button onclick="deleteAction(${action.id})" class="text-red-500 hover:bg-red-50 rounded p-2 transition-colors" title="Delete action">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            `;
+            actionsList.appendChild(li);
+            updateActionCount();
+        }
+
+        function deleteAction(actionId) {
+            actions = actions.filter(a => a.id !== actionId);
+            renderActions();
+            updateActionCount();
+        }
+
+        function renderActions() {
+            actionsList.innerHTML = '';
+            if (actions.length === 0) {
+                actionsList.innerHTML = `
+                    <div class="text-center py-12 text-gray-400">
+                        <div class="text-6xl mb-4">📋</div>
+                        <p class="font-semibold">No actions recorded yet</p>
+                    </div>
+                `;
+            } else {
+                actions.forEach(action => addActionToList(action));
+            }
+        }
+
+        function updateActionCount() {
+            actionCount.textContent = actions.length;
+        }
+
+        function enableExportButtons() {
+            const disabled = actions.length === 0;
+            document.getElementById('export-workflow-btn').disabled = disabled;
+            document.getElementById('export-json-btn').disabled = disabled;
+            document.getElementById('export-playwright-btn').disabled = disabled;
+            document.getElementById('copy-btn').disabled = disabled;
+        }
+
+        async function exportAsWorkflow() {
+            if (actions.length === 0) {
+                alert('No actions to export');
+                return;
+            }
+            const workflowName = prompt('Enter workflow name:', 'Recorded Workflow');
+            if (!workflowName) return;
+            console.log('Exporting as workflow:', workflowName, actions);
+            alert('Export as Workflow will be implemented in Ticket #036');
+        }
+
+        async function exportAsJSON() {
+            if (actions.length === 0) {
+                alert('No actions to export');
+                return;
+            }
+            const json = JSON.stringify(actions, null, 2);
+            downloadFile('recording.json', json, 'application/json');
+        }
+
+        async function exportAsPlaywright() {
+            if (actions.length === 0) {
+                alert('No actions to export');
+                return;
+            }
+            alert('Export as Playwright will be implemented in Ticket #036');
+        }
+
+        async function copyToClipboard() {
+            if (actions.length === 0) {
+                alert('No actions to copy');
+                return;
+            }
+            const json = JSON.stringify(actions, null, 2);
+            try {
+                await navigator.clipboard.writeText(json);
+                alert('✅ Copied to clipboard!');
+            } catch (error) {
+                console.error('Failed to copy:', error);
+                alert('Failed to copy to clipboard');
+            }
+        }
+
+        function downloadFile(filename, content, contentType) {
+            const blob = new Blob([content], { type: contentType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        /*]]>*/
+    </script>
+</body>
+</html>
