@@ -184,6 +184,7 @@
         saveWorkflowBtn.addEventListener('click', saveAsWorkflow);
         exportJsonBtn.addEventListener('click', exportAsJSON);
         copyBtn.addEventListener('click', copyToClipboard);
+        streamCanvas.addEventListener('click', handleCanvasClick);
 
         async function loadPage() {
             const url = urlInput.value.trim();
@@ -281,6 +282,44 @@
                 }
             };
             img.src = 'data:image/png;base64,' + frameData.imageData;
+        }
+
+        async function handleCanvasClick(event) {
+            if (!sessionId) {
+                return;
+            }
+
+            // Get canvas bounding rect
+            const rect = canvas.getBoundingClientRect();
+
+            // Calculate click position relative to displayed canvas
+            const displayX = event.clientX - rect.left;
+            const displayY = event.clientY - rect.top;
+
+            // Calculate scaling factors
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            // Convert to actual page coordinates
+            const pageX = displayX * scaleX;
+            const pageY = displayY * scaleY;
+
+            console.log('Canvas click:', { displayX, displayY, pageX, pageY, scaleX, scaleY });
+
+            try {
+                // Send click to backend
+                const response = await fetch(`${API_BASE_URL}/recorder/sessions/${sessionId}/click`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ x: pageX, y: pageY })
+                });
+
+                if (!response.ok) {
+                    console.error('Failed to send click to backend');
+                }
+            } catch (error) {
+                console.error('Error sending click:', error);
+            }
         }
 
         async function toggleRecording() {

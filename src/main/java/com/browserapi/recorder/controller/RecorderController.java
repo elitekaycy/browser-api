@@ -230,6 +230,47 @@ public class RecorderController {
     }
 
     /**
+     * Send a mouse click to the browser at specific coordinates.
+     */
+    @PostMapping("/api/v1/recorder/sessions/{sessionId}/click")
+    @ResponseBody
+    @Operation(
+            summary = "Send click to browser",
+            description = "Sends a mouse click to the browser page at the specified coordinates."
+    )
+    public ResponseEntity<?> sendClick(@PathVariable String sessionId, @RequestBody ClickRequest request) {
+        log.debug("Send click: sessionId={}, x={}, y={}", sessionId, request.x(), request.y());
+
+        try {
+            UUID uuid = UUID.fromString(sessionId);
+
+            RecorderSession session = sessionManager.getSession(uuid)
+                    .orElseThrow(() -> new IllegalArgumentException("Session not found: " + sessionId));
+
+            // Get the browser page and perform click
+            sessionManager.performClick(uuid, request.x(), request.y());
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Click sent successfully",
+                    "x", request.x(),
+                    "y", request.y()
+            ));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                    "error", "Session not found",
+                    "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Failed to send click", e);
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "error", "Failed to send click",
+                    "message", e.getMessage()
+            ));
+        }
+    }
+
+    /**
      * Close a recorder session.
      */
     @DeleteMapping("/api/v1/recorder/sessions/{sessionId}")
@@ -286,4 +327,6 @@ public class RecorderController {
     public record StopRecordingResponse(String status, int actionCount) {}
 
     public record GetActionsResponse(List<Action> actions, int count) {}
+
+    public record ClickRequest(double x, double y) {}
 }

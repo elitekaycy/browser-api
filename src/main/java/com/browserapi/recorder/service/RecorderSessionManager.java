@@ -137,6 +137,30 @@ public class RecorderSessionManager {
     }
 
     /**
+     * Perform a mouse click at the specified coordinates in the browser.
+     *
+     * @param sessionId recorder session ID
+     * @param x X coordinate
+     * @param y Y coordinate
+     */
+    public void performClick(UUID sessionId, double x, double y) {
+        RecorderSession recorderSession = getSession(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("Recorder session not found: " + sessionId));
+
+        UUID browserSessionId = recorderSession.getBrowserSessionId();
+        if (browserSessionId == null) {
+            throw new IllegalStateException("No browser session associated with recorder session: " + sessionId);
+        }
+
+        PageSession pageSession = browserManager.getSession(browserSessionId)
+                .orElseThrow(() -> new IllegalStateException("Browser session not found: " + browserSessionId));
+
+        log.debug("Performing click at ({}, {}) for session: {}", x, y, sessionId);
+        pageSession.page().mouse().click(x, y);
+        log.debug("Click performed successfully");
+    }
+
+    /**
      * Close a recorder session and its associated browser session.
      *
      * @param sessionId recorder session ID
