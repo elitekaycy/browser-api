@@ -14,38 +14,38 @@
             transform: translateY(-2px);
             transition: transform 0.2s;
         }
+        .sidebar-link.active {
+            background-color: #EFF6FF;
+            color: #2563EB;
+            font-weight: 600;
+        }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <!-- Top Navigation -->
-    <nav class="bg-white border-b border-gray-200">
-        <div class="px-6 py-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-6">
-                    <h1 class="text-xl font-semibold text-gray-900">Browser API</h1>
-                    <div class="flex gap-1">
-                        <a href="/workflows" class="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded">
-                            Workflows
-                        </a>
-                        <a href="/recorder" class="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded">
-                            Recorder
-                        </a>
-                        <a href="/swagger-ui/index.html" target="_blank" class="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded">
-                            API Docs
-                        </a>
-                    </div>
+<body class="bg-gray-50 h-screen overflow-hidden">
+    <!-- Top Toolbar -->
+    <div class="border-b border-gray-200 bg-white">
+        <div class="flex items-center justify-between px-4 py-3">
+            <div class="flex items-center gap-4 flex-1">
+                <div class="flex items-center gap-4">
+                    <span class="text-xs font-medium text-gray-500">Workflows</span>
+                    <a href="/recorder" class="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Go to Recorder
+                    </a>
                 </div>
-                <button id="new-workflow-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700">
-                    + New Workflow
-                </button>
             </div>
+            <button id="new-workflow-btn" onclick="alert('Create workflow via Recorder')" class="px-4 py-1.5 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700">
+                + New Workflow
+            </button>
         </div>
-    </nav>
+    </div>
 
     <!-- Main Content -->
-    <div class="flex h-[calc(100vh-73px)]">
+    <div class="flex h-[calc(100vh-57px)]">
         <!-- Sidebar -->
-        <div class="w-80 bg-white border-r border-gray-200 flex flex-col">
+        <div class="w-64 bg-white border-r border-gray-200 flex flex-col">
             <!-- Search -->
             <div class="p-4 border-b border-gray-200">
                 <input
@@ -56,60 +56,83 @@
                 />
             </div>
 
-            <!-- Filters -->
-            <div class="p-4 border-b border-gray-200">
-                <h3 class="text-xs font-semibold text-gray-900 uppercase mb-3">Filters</h3>
-                <div class="space-y-2">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="filter-recent" class="rounded text-blue-600">
-                        <span class="text-sm text-gray-700">Recently Used</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="filter-never-executed" class="rounded text-blue-600">
-                        <span class="text-sm text-gray-700">Never Executed</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="filter-high-success" class="rounded text-blue-600">
-                        <span class="text-sm text-gray-700">High Success Rate</span>
-                    </label>
+            <!-- Navigation Links -->
+            <div class="p-3 border-b border-gray-200">
+                <h3 class="text-xs font-semibold text-gray-500 uppercase mb-2 px-2">Views</h3>
+                <div class="space-y-1">
+                    <a href="/workflows" class="sidebar-link block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded" th:classappend="${view == 'all'} ? 'active' : ''">
+                        All Workflows
+                    </a>
+                    <a href="/workflows/most-executed" class="sidebar-link block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded" th:classappend="${view == 'most-executed'} ? 'active' : ''">
+                        Most Executed
+                    </a>
+                    <a href="/workflows/most-successful" class="sidebar-link block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded" th:classappend="${view == 'most-successful'} ? 'active' : ''">
+                        Most Successful
+                    </a>
+                    <a href="/workflows/recently-created" class="sidebar-link block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded" th:classappend="${view == 'recently-created'} ? 'active' : ''">
+                        Recently Created
+                    </a>
+                    <a href="/workflows/recently-executed" class="sidebar-link block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded" th:classappend="${view == 'recently-executed'} ? 'active' : ''">
+                        Recently Executed
+                    </a>
+                    <a href="/workflows/never-executed" class="sidebar-link block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded" th:classappend="${view == 'never-executed'} ? 'active' : ''">
+                        Never Executed
+                    </a>
+                    <a href="/workflows/statistics" class="sidebar-link block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded" th:classappend="${view == 'statistics'} ? 'active' : ''">
+                        Statistics
+                    </a>
                 </div>
             </div>
 
             <!-- Tags -->
-            <div class="p-4 border-b border-gray-200">
-                <h3 class="text-xs font-semibold text-gray-900 uppercase mb-3">Tags</h3>
-                <div id="tags-container" class="flex flex-wrap gap-2">
-                    <span class="text-xs text-gray-500">Loading...</span>
-                </div>
-            </div>
-
-            <!-- Analytics Shortcuts -->
-            <div class="p-4 flex-1 overflow-y-auto">
-                <h3 class="text-xs font-semibold text-gray-900 uppercase mb-3">Quick Views</h3>
-                <div class="space-y-1">
-                    <button onclick="loadMostExecuted()" class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded">
-                        Most Executed
-                    </button>
-                    <button onclick="loadMostSuccessful()" class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded">
-                        Most Successful
-                    </button>
-                    <button onclick="loadRecentlyCreated()" class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded">
-                        Recently Created
-                    </button>
-                    <button onclick="showStatistics()" class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded">
-                        Statistics
-                    </button>
+            <div class="p-3 flex-1 overflow-y-auto">
+                <h3 class="text-xs font-semibold text-gray-500 uppercase mb-2 px-2">Tags</h3>
+                <div id="tags-container" class="flex flex-wrap gap-2 px-2">
+                    <span class="text-xs text-gray-400">Loading...</span>
                 </div>
             </div>
         </div>
 
         <!-- Main Content Area -->
         <div class="flex-1 overflow-y-auto">
-            <!-- Grid View -->
-            <div id="grid-view" class="p-6">
+            <div class="p-6">
+                <!-- Page Header -->
                 <div class="mb-6">
-                    <h2 class="text-2xl font-bold text-gray-900">Workflows</h2>
-                    <p class="text-sm text-gray-500 mt-1">Manage and execute your browser automation workflows</p>
+                    <h2 class="text-2xl font-bold text-gray-900" id="page-title">Workflows</h2>
+                    <p class="text-sm text-gray-500 mt-1" id="page-description">Manage and execute your browser automation workflows</p>
+                </div>
+
+                <!-- Statistics View (only shown when view=statistics) -->
+                <div id="statistics-view" class="hidden">
+                    <div class="grid grid-cols-4 gap-4 mb-6">
+                        <div class="bg-white border border-gray-200 rounded-lg p-6">
+                            <div class="text-3xl font-bold text-gray-900" id="stat-total">0</div>
+                            <div class="text-sm text-gray-600 mt-1">Total Workflows</div>
+                        </div>
+                        <div class="bg-white border border-gray-200 rounded-lg p-6">
+                            <div class="text-3xl font-bold text-gray-900" id="stat-executions">0</div>
+                            <div class="text-sm text-gray-600 mt-1">Total Executions</div>
+                        </div>
+                        <div class="bg-white border border-gray-200 rounded-lg p-6">
+                            <div class="text-3xl font-bold text-green-600" id="stat-success-rate">0%</div>
+                            <div class="text-sm text-gray-600 mt-1">Success Rate</div>
+                        </div>
+                        <div class="bg-white border border-gray-200 rounded-lg p-6">
+                            <div class="text-3xl font-bold text-gray-900" id="stat-avg-time">0ms</div>
+                            <div class="text-sm text-gray-600 mt-1">Avg Time</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-6">
+                            <div class="text-2xl font-bold text-green-600" id="stat-successful">0</div>
+                            <div class="text-sm text-green-700 mt-1">Successful Executions</div>
+                        </div>
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-6">
+                            <div class="text-2xl font-bold text-red-600" id="stat-failed">0</div>
+                            <div class="text-sm text-red-700 mt-1">Failed Executions</div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Loading State -->
@@ -136,19 +159,18 @@
                 <div id="workflows-grid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <!-- Workflow cards will be inserted here -->
                 </div>
-            </div>
 
-            <!-- Detail View (hidden by default) -->
-            <div id="detail-view" class="hidden p-6">
-                <button onclick="closeDetailView()" class="mb-4 flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                    </svg>
-                    Back to workflows
-                </button>
-
-                <div id="workflow-detail-content">
-                    <!-- Workflow detail will be inserted here -->
+                <!-- Detail View -->
+                <div id="detail-view" class="hidden">
+                    <button onclick="closeDetailView()" class="mb-4 flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                        Back to workflows
+                    </button>
+                    <div id="workflow-detail-content">
+                        <!-- Workflow detail will be inserted here -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -166,56 +188,68 @@
         </div>
     </div>
 
-    <!-- Statistics Modal -->
-    <div id="stats-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4">
-            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-gray-900">Workflow Statistics</h3>
-                <button onclick="closeStatsModal()" class="text-gray-400 hover:text-gray-600">
-                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-            <div id="stats-modal-content" class="px-6 py-4">
-                <!-- Stats content will be inserted here -->
-            </div>
-        </div>
-    </div>
-
     <script th:inline="javascript">
         /*<![CDATA[*/
         const API_BASE_URL = /*[[${apiBaseUrl}]]*/ '/api/v1';
+        const CURRENT_VIEW = /*[[${view}]]*/ 'all';
 
         let allWorkflows = [];
-        let filteredWorkflows = [];
         let allTags = new Set();
         let selectedWorkflow = null;
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', async function() {
-            await loadWorkflows();
+            await loadWorkflowsForView();
             setupEventListeners();
         });
 
         function setupEventListeners() {
             const searchInput = document.getElementById('search-input');
             searchInput.addEventListener('input', debounce(handleSearch, 300));
-
-            const filters = ['filter-recent', 'filter-never-executed', 'filter-high-success'];
-            filters.forEach(id => {
-                document.getElementById(id)?.addEventListener('change', applyFilters);
-            });
         }
 
-        async function loadWorkflows() {
+        async function loadWorkflowsForView() {
             try {
                 showLoading();
-                const response = await fetch(`${API_BASE_URL}/workflows?page=0&size=100`);
+                let endpoint = '';
+
+                switch(CURRENT_VIEW) {
+                    case 'most-executed':
+                        endpoint = `${API_BASE_URL}/workflows/most-executed`;
+                        updatePageHeader('Most Executed Workflows', 'Workflows ordered by execution count');
+                        break;
+                    case 'most-successful':
+                        endpoint = `${API_BASE_URL}/workflows/most-successful?page=0&size=100`;
+                        updatePageHeader('Most Successful Workflows', 'Workflows with highest success rates');
+                        break;
+                    case 'recently-created':
+                        endpoint = `${API_BASE_URL}/workflows/recently-created`;
+                        updatePageHeader('Recently Created Workflows', 'Latest created workflows');
+                        break;
+                    case 'recently-executed':
+                        endpoint = `${API_BASE_URL}/workflows/recently-executed`;
+                        updatePageHeader('Recently Executed Workflows', 'Most recently run workflows');
+                        break;
+                    case 'never-executed':
+                        endpoint = `${API_BASE_URL}/workflows/never-executed`;
+                        updatePageHeader('Never Executed Workflows', 'Workflows that have never been run');
+                        break;
+                    case 'statistics':
+                        await loadStatistics();
+                        return;
+                    default:
+                        endpoint = `${API_BASE_URL}/workflows?page=0&size=100`;
+                        updatePageHeader('All Workflows', 'Manage and execute your browser automation workflows');
+                }
+
+                const response = await fetch(endpoint);
                 const data = await response.json();
 
-                allWorkflows = data.content || [];
-                filteredWorkflows = [...allWorkflows];
+                if (data.content) {
+                    allWorkflows = data.content;
+                } else {
+                    allWorkflows = data;
+                }
 
                 extractTags();
                 renderWorkflows();
@@ -225,6 +259,45 @@
                 console.error('Failed to load workflows:', error);
                 showError('Failed to load workflows');
             }
+        }
+
+        async function loadStatistics() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/workflows/statistics`);
+                const stats = await response.json();
+
+                updatePageHeader('Workflow Statistics', 'Global statistics across all workflows');
+
+                document.getElementById('loading-state').classList.add('hidden');
+                document.getElementById('statistics-view').classList.remove('hidden');
+
+                const globalSuccessRate = stats.totalExecutions > 0
+                    ? ((stats.successfulExecutions / stats.totalExecutions) * 100).toFixed(1)
+                    : 0;
+
+                document.getElementById('stat-total').textContent = stats.totalWorkflows;
+                document.getElementById('stat-executions').textContent = stats.totalExecutions || 0;
+                document.getElementById('stat-success-rate').textContent = globalSuccessRate + '%';
+                document.getElementById('stat-avg-time').textContent = Math.round(stats.averageExecutionTimeMs || 0) + 'ms';
+                document.getElementById('stat-successful').textContent = stats.successfulExecutions || 0;
+                document.getElementById('stat-failed').textContent = stats.failedExecutions || 0;
+
+                // Also load all workflows for tags
+                const workflowsResponse = await fetch(`${API_BASE_URL}/workflows?page=0&size=100`);
+                const workflowsData = await workflowsResponse.json();
+                allWorkflows = workflowsData.content || [];
+                extractTags();
+                renderTags();
+
+            } catch (error) {
+                console.error('Failed to load statistics:', error);
+                showError('Failed to load statistics');
+            }
+        }
+
+        function updatePageHeader(title, description) {
+            document.getElementById('page-title').textContent = title;
+            document.getElementById('page-description').textContent = description;
         }
 
         function extractTags() {
@@ -247,9 +320,9 @@
             }
 
             container.innerHTML = Array.from(allTags).map(tag => `
-                <button onclick="filterByTag('${tag}')"
+                <button onclick="filterByTag('${escapeHtml(tag)}')"
                         class="px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded">
-                    ${tag}
+                    ${escapeHtml(tag)}
                 </button>
             `).join('');
         }
@@ -258,10 +331,12 @@
             const loadingState = document.getElementById('loading-state');
             const emptyState = document.getElementById('empty-state');
             const grid = document.getElementById('workflows-grid');
+            const statsView = document.getElementById('statistics-view');
 
             loadingState.classList.add('hidden');
+            statsView.classList.add('hidden');
 
-            if (filteredWorkflows.length === 0) {
+            if (allWorkflows.length === 0) {
                 emptyState.classList.remove('hidden');
                 grid.classList.add('hidden');
                 return;
@@ -270,7 +345,7 @@
             emptyState.classList.add('hidden');
             grid.classList.remove('hidden');
 
-            grid.innerHTML = filteredWorkflows.map(workflow => renderWorkflowCard(workflow)).join('');
+            grid.innerHTML = allWorkflows.map(workflow => renderWorkflowCard(workflow)).join('');
         }
 
         function renderWorkflowCard(workflow) {
@@ -287,19 +362,16 @@
                      onclick="viewWorkflow('${workflow.id}')">
                     <div class="flex items-start justify-between mb-2">
                         <h3 class="text-base font-semibold text-gray-900">${escapeHtml(workflow.name)}</h3>
-                        <div class="flex gap-1">
-                            <button onclick="event.stopPropagation(); executeWorkflow('${workflow.id}')"
-                                    class="p-1 text-gray-400 hover:text-blue-600" title="Execute">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </button>
-                        </div>
+                        <button onclick="event.stopPropagation(); executeWorkflow('${workflow.id}')"
+                                class="p-1 text-gray-400 hover:text-blue-600" title="Execute">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </button>
                     </div>
 
                     <p class="text-sm text-gray-600 mb-3 line-clamp-2">${escapeHtml(workflow.description || 'No description')}</p>
-
                     <div class="text-xs text-gray-500 mb-3 truncate">${escapeHtml(workflow.url)}</div>
 
                     ${tags.length > 0 ? `
@@ -338,7 +410,9 @@
                 const response = await fetch(`${API_BASE_URL}/workflows/${id}`);
                 selectedWorkflow = await response.json();
 
-                document.getElementById('grid-view').classList.add('hidden');
+                document.getElementById('workflows-grid').classList.add('hidden');
+                document.getElementById('empty-state').classList.add('hidden');
+                document.getElementById('statistics-view').classList.add('hidden');
                 document.getElementById('detail-view').classList.remove('hidden');
 
                 renderWorkflowDetail();
@@ -375,7 +449,6 @@
                         </div>
                     </div>
 
-                    <!-- Stats Cards -->
                     <div class="grid grid-cols-4 gap-4 mb-6">
                         <div class="bg-white border border-gray-200 rounded-lg p-4">
                             <div class="text-2xl font-bold text-gray-900">${workflow.totalExecutions || 0}</div>
@@ -395,13 +468,11 @@
                         </div>
                     </div>
 
-                    <!-- URL -->
                     <div class="bg-white border border-gray-200 rounded-lg p-4 mb-6">
                         <h3 class="text-sm font-semibold text-gray-900 mb-2">Target URL</h3>
                         <code class="text-sm text-gray-700">${escapeHtml(workflow.url)}</code>
                     </div>
 
-                    <!-- Actions -->
                     <div class="bg-white border border-gray-200 rounded-lg p-4">
                         <h3 class="text-sm font-semibold text-gray-900 mb-4">Actions (${workflow.actions?.length || 0} steps)</h3>
                         <div class="space-y-2">
@@ -438,7 +509,6 @@
                 const response = await fetch(`${API_BASE_URL}/workflows/${id}`);
                 const workflow = await response.json();
 
-                // Check for parameters
                 const params = extractParameters(workflow);
 
                 if (params.length > 0) {
@@ -524,8 +594,7 @@
                     alert(`Workflow execution failed: ${result.actionResults?.find(r => !r.success)?.message || 'Unknown error'}`);
                 }
 
-                // Reload to get updated stats
-                await loadWorkflows();
+                await loadWorkflowsForView();
                 if (selectedWorkflow && selectedWorkflow.id === id) {
                     await viewWorkflow(id);
                 }
@@ -543,7 +612,7 @@
                 await fetch(`${API_BASE_URL}/workflows/${id}`, { method: 'DELETE' });
                 alert('Workflow deleted successfully');
                 closeDetailView();
-                await loadWorkflows();
+                await loadWorkflowsForView();
 
             } catch (error) {
                 console.error('Failed to delete workflow:', error);
@@ -551,93 +620,10 @@
             }
         }
 
-        async function showStatistics() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/workflows/statistics`);
-                const stats = await response.json();
-
-                const modal = document.getElementById('stats-modal');
-                const content = document.getElementById('stats-modal-content');
-
-                const globalSuccessRate = stats.totalExecutions > 0
-                    ? ((stats.successfulExecutions / stats.totalExecutions) * 100).toFixed(1)
-                    : 0;
-
-                content.innerHTML = `
-                    <div class="grid grid-cols-4 gap-4 mb-6">
-                        <div class="text-center">
-                            <div class="text-3xl font-bold text-gray-900">${stats.totalWorkflows}</div>
-                            <div class="text-sm text-gray-600">Total Workflows</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-3xl font-bold text-gray-900">${stats.totalExecutions || 0}</div>
-                            <div class="text-sm text-gray-600">Total Executions</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-3xl font-bold text-green-600">${globalSuccessRate}%</div>
-                            <div class="text-sm text-gray-600">Success Rate</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-3xl font-bold text-gray-900">${Math.round(stats.averageExecutionTimeMs || 0)}ms</div>
-                            <div class="text-sm text-gray-600">Avg Time</div>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                            <div class="text-2xl font-bold text-green-600">${stats.successfulExecutions || 0}</div>
-                            <div class="text-sm text-green-700">Successful Executions</div>
-                        </div>
-                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                            <div class="text-2xl font-bold text-red-600">${stats.failedExecutions || 0}</div>
-                            <div class="text-sm text-red-700">Failed Executions</div>
-                        </div>
-                    </div>
-                `;
-
-                modal.classList.remove('hidden');
-
-            } catch (error) {
-                console.error('Failed to load statistics:', error);
-                alert('Failed to load statistics');
-            }
-        }
-
-        async function loadMostExecuted() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/workflows/most-executed`);
-                filteredWorkflows = await response.json();
-                renderWorkflows();
-            } catch (error) {
-                console.error('Failed to load most executed:', error);
-            }
-        }
-
-        async function loadMostSuccessful() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/workflows/most-successful?page=0&size=10`);
-                const data = await response.json();
-                filteredWorkflows = data.content || [];
-                renderWorkflows();
-            } catch (error) {
-                console.error('Failed to load most successful:', error);
-            }
-        }
-
-        async function loadRecentlyCreated() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/workflows/recently-created`);
-                filteredWorkflows = await response.json();
-                renderWorkflows();
-            } catch (error) {
-                console.error('Failed to load recently created:', error);
-            }
-        }
-
         async function filterByTag(tag) {
             try {
                 const response = await fetch(`${API_BASE_URL}/workflows/by-tag?tag=${encodeURIComponent(tag)}`);
-                filteredWorkflows = await response.json();
+                allWorkflows = await response.json();
                 renderWorkflows();
             } catch (error) {
                 console.error('Failed to filter by tag:', error);
@@ -650,44 +636,27 @@
             if (query) {
                 try {
                     const response = await fetch(`${API_BASE_URL}/workflows/search?name=${encodeURIComponent(query)}`);
-                    filteredWorkflows = await response.json();
+                    allWorkflows = await response.json();
+                    renderWorkflows();
                 } catch (error) {
                     console.error('Search failed:', error);
                 }
             } else {
-                filteredWorkflows = [...allWorkflows];
+                await loadWorkflowsForView();
             }
-
-            applyFilters();
-        }
-
-        function applyFilters() {
-            let filtered = [...filteredWorkflows];
-
-            const filterRecent = document.getElementById('filter-recent')?.checked;
-            const filterNeverExecuted = document.getElementById('filter-never-executed')?.checked;
-            const filterHighSuccess = document.getElementById('filter-high-success')?.checked;
-
-            if (filterNeverExecuted) {
-                filtered = filtered.filter(w => !w.totalExecutions || w.totalExecutions === 0);
-            }
-
-            if (filterHighSuccess) {
-                filtered = filtered.filter(w => {
-                    const successRate = w.totalExecutions > 0
-                        ? (w.successfulExecutions / w.totalExecutions) * 100
-                        : 0;
-                    return successRate >= 90;
-                });
-            }
-
-            filteredWorkflows = filtered;
-            renderWorkflows();
         }
 
         function closeDetailView() {
             document.getElementById('detail-view').classList.add('hidden');
-            document.getElementById('grid-view').classList.remove('hidden');
+
+            if (CURRENT_VIEW === 'statistics') {
+                document.getElementById('statistics-view').classList.remove('hidden');
+            } else if (allWorkflows.length > 0) {
+                document.getElementById('workflows-grid').classList.remove('hidden');
+            } else {
+                document.getElementById('empty-state').classList.remove('hidden');
+            }
+
             selectedWorkflow = null;
         }
 
@@ -695,14 +664,11 @@
             document.getElementById('execute-modal').classList.add('hidden');
         }
 
-        function closeStatsModal() {
-            document.getElementById('stats-modal').classList.add('hidden');
-        }
-
         function showLoading() {
             document.getElementById('loading-state').classList.remove('hidden');
             document.getElementById('empty-state').classList.add('hidden');
             document.getElementById('workflows-grid').classList.add('hidden');
+            document.getElementById('statistics-view').classList.add('hidden');
         }
 
         function showError(message) {
