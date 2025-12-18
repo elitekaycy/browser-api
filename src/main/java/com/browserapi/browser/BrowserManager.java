@@ -52,6 +52,14 @@ public interface BrowserManager {
     PageSession createSession(String url, WaitStrategy waitStrategy, Long timeoutMs);
 
     /**
+     * Retrieves an active session by its ID.
+     *
+     * @param sessionId the unique session identifier
+     * @return Optional containing the PageSession if found
+     */
+    java.util.Optional<PageSession> getSession(UUID sessionId);
+
+    /**
      * Closes a specific browser session and releases its resources.
      * Safe to call multiple times for the same session ID.
      *

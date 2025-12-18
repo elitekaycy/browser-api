@@ -129,6 +129,19 @@ public class BrowserManagerImpl implements BrowserManager, DisposableBean {
     }
 
     @Override
+    public java.util.Optional<PageSession> getSession(UUID sessionId) {
+        if (sessionId == null) {
+            return java.util.Optional.empty();
+        }
+
+        PageSession session = activeSessions.get(sessionId);
+        if (session != null) {
+            session.touch(); // Update last accessed timestamp
+        }
+        return java.util.Optional.ofNullable(session);
+    }
+
+    @Override
     public void closeSession(UUID sessionId) {
         if (sessionId == null) {
             return;
