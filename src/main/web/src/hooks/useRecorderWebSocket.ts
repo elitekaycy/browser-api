@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import SockJS from 'sockjs-client';
-import { Client, IMessage } from '@stomp/stompjs';
+import { Client } from '@stomp/stompjs';
+import type { IMessage } from '@stomp/stompjs';
 import type { FrameData, Action } from '../types/recorder';
 
 interface UseRecorderWebSocketProps {
@@ -57,7 +58,7 @@ export const useRecorderWebSocket = ({
       onStompError: (frame) => {
         console.error('STOMP error:', frame);
       },
-      debug: (str) => {
+      debug: () => {
         // Uncomment for debugging
         // console.log('STOMP debug:', str);
       },

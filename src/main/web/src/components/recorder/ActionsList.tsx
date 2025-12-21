@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import type { Action } from '../../types/recorder';
-import { ApiService } from '../../services/api';
 import { Button } from '../ui/button';
 import { PlaywrightCodeGenerator, type CodeLanguage } from '../../services/codeGenerator';
 

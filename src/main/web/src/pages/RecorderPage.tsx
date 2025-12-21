@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRecorderStore } from '../stores/recorderStore';
 import { RecorderApiService } from '../services/recorderApi';
 import { useRecorderWebSocket } from '../hooks/useRecorderWebSocket';
