@@ -1,9 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useWorkflowStore } from '../stores/workflowStore';
 import { ApiService } from '../services/api';
+import { WorkflowDialog } from '../components/workflows/WorkflowDialog';
+import { Button } from '../components/ui/button';
+import type { Workflow } from '../types/workflow';
 
 export const WorkflowsPage = () => {
   const { workflows, setWorkflows, setLoading, setError } = useWorkflowStore();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null);
 
   useEffect(() => {
     loadWorkflows();
@@ -22,32 +27,72 @@ export const WorkflowsPage = () => {
     }
   };
 
+  const handleCreateWorkflow = async (workflow: Omit<Workflow, 'id'>) => {
+    if (editingWorkflow?.id) {
+      await ApiService.updateWorkflow(editingWorkflow.id, workflow);
+    } else {
+      await ApiService.createWorkflow(workflow);
+    }
+    await loadWorkflows();
+    setEditingWorkflow(null);
+  };
+
+  const handleEditClick = (workflow: Workflow) => {
+    setEditingWorkflow(workflow);
+    setDialogOpen(true);
+  };
+
+  const handleNewClick = () => {
+    setEditingWorkflow(null);
+    setDialogOpen(true);
+  };
+
+  const handleExecute = async (workflowId: number) => {
+    try {
+      await ApiService.executeWorkflow(workflowId);
+      alert('Workflow execution started!');
+    } catch (error) {
+      alert('Failed to execute workflow: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  };
+
+  const handleDelete = async (workflowId: number) => {
+    if (!confirm('Are you sure you want to delete this workflow?')) return;
+
+    try {
+      await ApiService.deleteWorkflow(workflowId);
+      await loadWorkflows();
+    } catch (error) {
+      alert('Failed to delete workflow: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
+      <header className="border-b bg-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-bold text-gray-900">Browser API</h1>
+              <h1 className="text-2xl font-bold">Browser API</h1>
               <nav className="flex gap-4">
                 <a
                   href="/recorder"
-                  className="text-sm font-medium text-gray-600 hover:text-gray-900"
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground"
                 >
                   Recorder
                 </a>
                 <a
                   href="/workflows"
-                  className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                  className="text-sm font-medium text-primary"
                 >
                   Workflows
                 </a>
               </nav>
             </div>
-            <button className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+            <Button onClick={handleNewClick}>
               New Workflow
-            </button>
+            </Button>
           </div>
         </div>
       </header>
@@ -55,8 +100,8 @@ export const WorkflowsPage = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">Workflows</h2>
-          <p className="mt-1 text-sm text-gray-500">
+          <h2 className="text-xl font-semibold">Workflows</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             Manage and execute your browser automation workflows
           </p>
         </div>
@@ -66,7 +111,7 @@ export const WorkflowsPage = () => {
           {workflows.length === 0 ? (
             <div className="col-span-full flex flex-col items-center justify-center py-12 text-center">
               <svg
-                className="w-16 h-16 text-gray-300 mb-4"
+                className="w-16 h-16 text-muted mb-4"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -78,37 +123,77 @@ export const WorkflowsPage = () => {
                   d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
                 />
               </svg>
-              <h3 className="text-lg font-medium text-gray-900 mb-1">
+              <h3 className="text-lg font-medium mb-1">
                 No workflows yet
               </h3>
-              <p className="text-sm text-gray-500 mb-4">
+              <p className="text-sm text-muted-foreground mb-4">
                 Get started by creating your first workflow or recording one
               </p>
               <div className="flex gap-3">
-                <a
-                  href="/recorder"
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Go to Recorder
-                </a>
-                <button className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                <Button variant="outline" asChild>
+                  <a href="/recorder">Go to Recorder</a>
+                </Button>
+                <Button onClick={handleNewClick}>
                   Create Workflow
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
             workflows.map((workflow) => (
               <div
                 key={workflow.id}
-                className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow"
+                className="bg-card border rounded-lg p-6 hover:shadow-lg transition-shadow"
               >
                 <div className="flex items-start justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-gray-900">
+                  <h3 className="text-lg font-semibold">
                     {workflow.name}
                   </h3>
-                  <button className="text-gray-400 hover:text-gray-600">
+                </div>
+
+                {workflow.description && (
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {workflow.description}
+                  </p>
+                )}
+
+                <div className="flex items-center gap-2 mb-4 flex-wrap">
+                  <span className="px-2 py-1 text-xs font-medium bg-secondary text-secondary-foreground rounded">
+                    {workflow.actions.length} steps
+                  </span>
+                  {workflow.tags?.map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-2 py-1 text-xs font-medium bg-primary/10 text-primary rounded"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="text-xs text-muted-foreground mb-4 truncate">
+                  URL: {workflow.url}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    onClick={() => workflow.id && handleExecute(workflow.id)}
+                  >
+                    Execute
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleEditClick(workflow)}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    onClick={() => workflow.id && handleDelete(workflow.id)}
+                  >
                     <svg
-                      className="w-5 h-5"
+                      className="w-4 h-4"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -117,49 +202,26 @@ export const WorkflowsPage = () => {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                       />
                     </svg>
-                  </button>
-                </div>
-
-                {workflow.description && (
-                  <p className="text-sm text-gray-600 mb-4">
-                    {workflow.description}
-                  </p>
-                )}
-
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded">
-                    {workflow.actions.length} steps
-                  </span>
-                  {workflow.tags?.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="text-xs text-gray-500 mb-4">
-                  URL: {workflow.url}
-                </div>
-
-                <div className="flex gap-2">
-                  <button className="flex-1 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700">
-                    Execute
-                  </button>
-                  <button className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50">
-                    Edit
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))
           )}
         </div>
       </main>
+
+      <WorkflowDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setEditingWorkflow(null);
+        }}
+        workflow={editingWorkflow}
+        onSave={handleCreateWorkflow}
+      />
     </div>
   );
 };

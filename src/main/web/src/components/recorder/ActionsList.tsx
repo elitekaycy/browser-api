@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import type { Action } from '../../types/recorder';
 import { ApiService } from '../../services/api';
+import { Button } from '../ui/button';
+import { PlaywrightCodeGenerator, type CodeLanguage } from '../../services/codeGenerator';
 
 interface ActionsListProps {
   actions: Action[];
@@ -16,6 +18,7 @@ export const ActionsList = ({
   sessionUrl,
 }: ActionsListProps) => {
   const [newActionId, setNewActionId] = useState<number | null>(null);
+  const [showCodeMenu, setShowCodeMenu] = useState(false);
 
   // Highlight new actions briefly
   useEffect(() => {
@@ -28,13 +31,14 @@ export const ActionsList = ({
 
   const exportAsJSON = () => {
     const json = JSON.stringify(actions, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'recording.json';
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadFile('recording.json', json, 'application/json');
+  };
+
+  const exportAsCode = (language: CodeLanguage) => {
+    const code = PlaywrightCodeGenerator.generate(actions, sessionUrl, language);
+    const extension = language === 'typescript' ? 'ts' : language === 'python' ? 'py' : language === 'java' ? 'java' : 'js';
+    downloadFile(`workflow.${extension}`, code, 'text/plain');
+    setShowCodeMenu(false);
   };
 
   const copyToClipboard = async () => {
@@ -42,25 +46,36 @@ export const ActionsList = ({
     await navigator.clipboard.writeText(json);
   };
 
+  const downloadFile = (filename: string, content: string, type: string) => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="w-96 border-r border-gray-200 flex flex-col bg-gray-50">
+    <div className="w-96 border-r border-border flex flex-col bg-muted/40">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200 bg-white">
+      <div className="px-4 py-3 border-b border-border bg-card">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-gray-900">Recording</h3>
-            <span className="px-2 py-0.5 text-xs font-medium text-gray-600 bg-gray-100 rounded">
+            <h3 className="text-sm font-semibold">Recording</h3>
+            <span className="px-2 py-0.5 text-xs font-medium text-muted-foreground bg-secondary rounded">
               {actions.length} steps
             </span>
           </div>
-          <button
+          <Button
             onClick={onClear}
             disabled={actions.length === 0}
-            className="text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Clear all"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
           >
             Clear
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -69,7 +84,7 @@ export const ActionsList = ({
         {actions.length === 0 ? (
           <div className="px-4 py-12 text-center">
             <svg
-              className="mx-auto h-12 w-12 text-gray-300"
+              className="mx-auto h-12 w-12 text-muted"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -81,37 +96,37 @@ export const ActionsList = ({
                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
               />
             </svg>
-            <p className="mt-2 text-sm text-gray-500">No actions recorded</p>
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-2 text-sm text-muted-foreground">No actions recorded</p>
+            <p className="mt-1 text-xs text-muted-foreground">
               Load a page and start recording
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-border">
             {actions.map((action, idx) => (
               <div
                 key={idx}
-                className={`px-4 py-3 hover:bg-gray-50 border-l-2 transition-all duration-300 ${
+                className={`px-4 py-3 hover:bg-muted/60 border-l-2 transition-all duration-300 ${
                   idx === newActionId
-                    ? 'border-blue-500 bg-blue-50'
+                    ? 'border-primary bg-primary/10'
                     : 'border-transparent'
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-xs font-medium text-gray-400">
+                  <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-xs font-medium text-muted-foreground">
                     {idx + 1}
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-gray-900">
+                      <span className="text-xs font-medium">
                         {action.type}
                       </span>
                     </div>
-                    <div className="mt-0.5 text-xs font-mono text-gray-500 truncate">
+                    <div className="mt-0.5 text-xs font-mono text-muted-foreground truncate">
                       {action.selector || 'N/A'}
                     </div>
                     {action.value && (
-                      <div className="mt-0.5 text-xs text-gray-600">
+                      <div className="mt-0.5 text-xs text-foreground/70">
                         "{action.value}"
                       </div>
                     )}
@@ -124,30 +139,74 @@ export const ActionsList = ({
       </div>
 
       {/* Bottom Actions */}
-      <div className="border-t border-gray-200 bg-white p-3 space-y-2">
-        <button
+      <div className="border-t border-border bg-card p-3 space-y-2">
+        <Button
           onClick={onSaveWorkflow}
           disabled={actions.length === 0}
-          className="w-full px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full"
+          size="sm"
         >
           Save as Workflow
-        </button>
+        </Button>
         <div className="flex gap-2">
-          <button
+          <Button
             onClick={exportAsJSON}
             disabled={actions.length === 0}
-            className="flex-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            variant="outline"
+            size="sm"
+            className="flex-1 text-xs"
           >
             Export JSON
-          </button>
-          <button
-            onClick={copyToClipboard}
-            disabled={actions.length === 0}
-            className="flex-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Copy
-          </button>
+          </Button>
+          <div className="relative flex-1">
+            <Button
+              onClick={() => setShowCodeMenu(!showCodeMenu)}
+              disabled={actions.length === 0}
+              variant="outline"
+              size="sm"
+              className="w-full text-xs"
+            >
+              Export Code
+            </Button>
+            {showCodeMenu && (
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-card border border-border rounded-md shadow-lg overflow-hidden z-10">
+                <button
+                  onClick={() => exportAsCode('typescript')}
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-muted/60 transition-colors"
+                >
+                  TypeScript
+                </button>
+                <button
+                  onClick={() => exportAsCode('javascript')}
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-muted/60 transition-colors"
+                >
+                  JavaScript
+                </button>
+                <button
+                  onClick={() => exportAsCode('python')}
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-muted/60 transition-colors"
+                >
+                  Python
+                </button>
+                <button
+                  onClick={() => exportAsCode('java')}
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-muted/60 transition-colors"
+                >
+                  Java
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+        <Button
+          onClick={copyToClipboard}
+          disabled={actions.length === 0}
+          variant="ghost"
+          size="sm"
+          className="w-full text-xs"
+        >
+          Copy JSON
+        </Button>
       </div>
     </div>
   );
