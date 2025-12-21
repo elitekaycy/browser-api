@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -35,15 +36,18 @@ public class RecorderController {
     private final RecorderSessionManager sessionManager;
     private final FrameStreamingService frameStreamingService;
     private final EventCaptureService eventCaptureService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public RecorderController(
             RecorderSessionManager sessionManager,
             FrameStreamingService frameStreamingService,
-            EventCaptureService eventCaptureService
+            EventCaptureService eventCaptureService,
+            SimpMessagingTemplate messagingTemplate
     ) {
         this.sessionManager = sessionManager;
         this.frameStreamingService = frameStreamingService;
         this.eventCaptureService = eventCaptureService;
+        this.messagingTemplate = messagingTemplate;
     }
 
     /**
@@ -247,13 +251,27 @@ public class RecorderController {
             RecorderSession session = sessionManager.getSession(uuid)
                     .orElseThrow(() -> new IllegalArgumentException("Session not found: " + sessionId));
 
-            // Get the browser page and perform click
-            sessionManager.performClick(uuid, request.x(), request.y());
+            // Perform click and get the selector of clicked element
+            String selector = sessionManager.performClick(uuid, request.x(), request.y());
+
+            // If recording is active and we got a selector, manually add the action
+            if (session.isRecording() && selector != null && !selector.isEmpty()) {
+                Action clickAction = Action.click(selector);
+                session.addAction(clickAction);
+                log.debug("Manually added click action: {}", clickAction);
+
+                // Broadcast the action via WebSocket
+                messagingTemplate.convertAndSend(
+                        "/topic/recorder/" + sessionId + "/actions",
+                        clickAction
+                );
+            }
 
             return ResponseEntity.ok(Map.of(
                     "message", "Click sent successfully",
                     "x", request.x(),
-                    "y", request.y()
+                    "y", request.y(),
+                    "selector", selector != null ? selector : "unknown"
             ));
 
         } catch (IllegalArgumentException e) {

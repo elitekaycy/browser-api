@@ -142,8 +142,9 @@ public class RecorderSessionManager {
      * @param sessionId recorder session ID
      * @param x X coordinate
      * @param y Y coordinate
+     * @return the CSS selector of the clicked element (if found and recording)
      */
-    public void performClick(UUID sessionId, double x, double y) {
+    public String performClick(UUID sessionId, double x, double y) {
         RecorderSession recorderSession = getSession(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("Recorder session not found: " + sessionId));
 
@@ -156,8 +157,65 @@ public class RecorderSessionManager {
                 .orElseThrow(() -> new IllegalStateException("Browser session not found: " + browserSessionId));
 
         log.debug("Performing click at ({}, {}) for session: {}", x, y, sessionId);
+
+        // Get the element at these coordinates before clicking
+        String selector = null;
+        if (recorderSession.isRecording()) {
+            try {
+                // Evaluate JavaScript to get the element at coordinates and generate selector
+                selector = (String) pageSession.page().evaluate("""
+                    (coords) => {
+                        const element = document.elementFromPoint(coords.x, coords.y);
+                        if (!element) return null;
+
+                        // Generate selector (same logic as event capture)
+                        if (element.id) {
+                            return '#' + element.id;
+                        }
+                        if (element.name) {
+                            return element.tagName.toLowerCase() + '[name="' + element.name + '"]';
+                        }
+                        if (element.className && typeof element.className === 'string') {
+                            const classes = element.className.trim().split(/\\s+/).filter(c => c);
+                            if (classes.length > 0) {
+                                const selector = element.tagName.toLowerCase() + '.' + classes.join('.');
+                                if (document.querySelectorAll(selector).length === 1) {
+                                    return selector;
+                                }
+                            }
+                        }
+
+                        // Fall back to nth-child path
+                        let path = [];
+                        let current = element;
+                        while (current && current !== document.body) {
+                            let sel = current.tagName.toLowerCase();
+                            if (current.parentElement) {
+                                const siblings = Array.from(current.parentElement.children);
+                                const sameTagSiblings = siblings.filter(s => s.tagName === current.tagName);
+                                if (sameTagSiblings.length > 1) {
+                                    const index = sameTagSiblings.indexOf(current) + 1;
+                                    sel += ':nth-of-type(' + index + ')';
+                                }
+                            }
+                            path.unshift(sel);
+                            current = current.parentElement;
+                        }
+                        return path.join(' > ');
+                    }
+                    """, Map.of("x", x, "y", y));
+
+                log.debug("Element at ({}, {}) has selector: {}", x, y, selector);
+            } catch (Exception e) {
+                log.warn("Failed to get element selector at ({}, {}): {}", x, y, e.getMessage());
+            }
+        }
+
+        // Perform the actual click
         pageSession.page().mouse().click(x, y);
         log.debug("Click performed successfully");
+
+        return selector;
     }
 
     /**

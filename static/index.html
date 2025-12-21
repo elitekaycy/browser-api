@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browser API - Turn Any Website into an API</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* bg-gray-900 */
+        }
+        .gradient-text {
+            background: linear-gradient(to right, #34D399, #A78BFA);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 0 25px rgba(52, 211, 153, 0.2);
+        }
+    </style>
+</head>
+<body class="text-gray-300">
+
+    <!-- Header -->
+    <header class="sticky top-0 bg-gray-900/80 backdrop-blur-lg z-50 border-b border-gray-800">
+        <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="/" class="text-2xl font-bold text-white">
+                <span class="gradient-text">Browser API</span>
+            </a>
+            <div class="flex items-center space-x-4">
+                <a href="/docs.html" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-300">
+                    View Docs
+                </a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <main>
+        <section class="py-24 md:py-32 text-center">
+            <div class="container mx-auto px-6">
+                <h1 class="text-4xl md:text-6xl font-extrabold text-white leading-tight mb-4">
+                    Turn Any Website into an <span class="gradient-text">API</span>
+                </h1>
+                <p class="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto mb-8">
+                    A powerful REST API that runs a headless browser for you. Extract HTML, CSS, and JSON from any webpage with a simple API call. No more managing complex browser automation scripts.
+                </p>
+                <a href="/docs.html" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-full text-lg transition duration-300 transform hover:scale-105">
+                    Start Building
+                </a>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="py-20 bg-gray-900">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl md:text-4xl font-bold text-white">Why Browser API?</h2>
+                    <p class="text-gray-500 mt-2">Focus on your data, not on browser management.</p>
+                </div>
+                <div class="grid md:grid-cols-3 gap-8">
+                    <!-- Feature 1 -->
+                    <div class="bg-gray-800 p-8 rounded-xl shadow-lg border border-gray-700 feature-card transition-all duration-300">
+                        <h3 class="text-2xl font-bold text-green-400 mb-3">Powerful Content Extraction</h3>
+                        <p class="text-gray-400">
+                            Use CSS selectors to extract exactly what you need. Get clean HTML, computed CSS, or structured JSON data from any element on the page.
+                        </p>
+                    </div>
+                    <!-- Feature 2 -->
+                    <div class="bg-gray-800 p-8 rounded-xl shadow-lg border border-gray-700 feature-card transition-all duration-300">
+                        <h3 class="text-2xl font-bold text-green-400 mb-3">Full Component Collection</h3>
+                        <p class="text-gray-400">
+                            Collect all the CSS and JavaScript associated with a specific component, including stylesheets, inline styles, and event listeners. Perfect for component libraries.
+                        </p>
+                    </div>
+                    <!-- Feature 3 -->
+                    <div class="bg-gray-800 p-8 rounded-xl shadow-lg border border-gray-700 feature-card transition-all duration-300">
+                        <h3 class="text-2xl font-bold text-green-400 mb-3">Simple & Fast</h3>
+                        <p class="text-gray-400">
+                            Built-in caching and a simple, intuitive API mean you get your data quickly and efficiently. Powered by Spring Boot and Playwright for robust performance.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Getting Started Section -->
+        <section id="getting-started" class="py-20">
+            <div class="container mx-auto px-6 text-center">
+                <h2 class="text-3xl md:text-4xl font-bold text-white mb-8">Get Started in Minutes</h2>
+                <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 max-w-3xl mx-auto text-left relative">
+                    <button id="copy-button" class="absolute top-4 right-4 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-lg text-sm transition">Copy</button>
+                    <pre id="code-block" class="text-gray-300 overflow-x-auto"><code class="language-bash">
+# 1. Build the project with Maven
+$ mvn clean install
+
+# 2. Build the Docker image
+$ docker build -t browser-api .
+
+# 3. Run the container
+$ docker run -p 8080:8080 browser-api:latest
+                    </code></pre>
+                </div>
+                <p class="text-gray-400 max-w-2xl mx-auto mt-10">
+                    Once running, the API will be available at <code class="bg-gray-700 text-sm p-1 rounded">http://localhost:8080</code>.
+                    Check out the documentation for a full API reference.
+                </p>
+                 <a href="/docs.html" class="mt-8 inline-block bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-full text-lg transition duration-300 transform hover:scale-105">
+                    Read the Docs
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 py-8 border-t border-gray-800">
+        <div class="container mx-auto px-6 text-center text-gray-500">
+            <p>&copy; 2025 Browser API. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
