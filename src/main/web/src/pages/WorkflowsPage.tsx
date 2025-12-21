@@ -2,13 +2,17 @@ import { useEffect, useState } from 'react';
 import { useWorkflowStore } from '../stores/workflowStore';
 import { ApiService } from '../services/api';
 import { WorkflowDialog } from '../components/workflows/WorkflowDialog';
+import { ActionsDialog } from '../components/workflows/ActionsDialog';
 import { Button } from '../components/ui/button';
 import type { Workflow } from '../types/workflow';
+import type { Action } from '../types/workflow';
 
 export const WorkflowsPage = () => {
   const { workflows, setWorkflows, setLoading, setError } = useWorkflowStore();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null);
+  const [actionsDialogOpen, setActionsDialogOpen] = useState(false);
+  const [viewingWorkflow, setViewingWorkflow] = useState<Workflow | null>(null);
 
   useEffect(() => {
     loadWorkflows();
@@ -65,6 +69,21 @@ export const WorkflowsPage = () => {
     } catch (error) {
       alert('Failed to delete workflow: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
+  };
+
+  const handleViewActions = (workflow: Workflow) => {
+    setViewingWorkflow(workflow);
+    setActionsDialogOpen(true);
+  };
+
+  const handleSaveActions = async (actions: Action[]) => {
+    if (!viewingWorkflow?.id) return;
+
+    await ApiService.updateWorkflow(viewingWorkflow.id, {
+      ...viewingWorkflow,
+      actions,
+    });
+    await loadWorkflows();
   };
 
   return (
@@ -157,9 +176,12 @@ export const WorkflowsPage = () => {
                 )}
 
                 <div className="flex items-center gap-2 mb-4 flex-wrap">
-                  <span className="px-2 py-1 text-xs font-medium bg-secondary text-secondary-foreground rounded">
+                  <button
+                    onClick={() => handleViewActions(workflow)}
+                    className="px-2 py-1 text-xs font-medium bg-secondary text-secondary-foreground rounded hover:bg-secondary/80 transition-colors cursor-pointer"
+                  >
                     {workflow.actions.length} steps
-                  </span>
+                  </button>
                   {workflow.tags?.map((tag) => (
                     <span
                       key={tag}
@@ -221,6 +243,17 @@ export const WorkflowsPage = () => {
         }}
         workflow={editingWorkflow}
         onSave={handleCreateWorkflow}
+      />
+
+      <ActionsDialog
+        open={actionsDialogOpen}
+        onOpenChange={(open) => {
+          setActionsDialogOpen(open);
+          if (!open) setViewingWorkflow(null);
+        }}
+        workflowName={viewingWorkflow?.name || ''}
+        actions={viewingWorkflow?.actions || []}
+        onSave={handleSaveActions}
       />
     </div>
   );
