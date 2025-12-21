@@ -23,9 +23,12 @@ export const WorkflowsPage = () => {
       setLoading(true);
       setError(null);
       const data = await ApiService.getWorkflows();
-      setWorkflows(data);
+      // Ensure data is always an array
+      setWorkflows(Array.isArray(data) ? data : []);
     } catch (err) {
+      console.error('Failed to load workflows:', err);
       setError(err instanceof Error ? err.message : 'Failed to load workflows');
+      setWorkflows([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
@@ -152,7 +155,7 @@ export const WorkflowsPage = () => {
 
             {/* Workflows Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {workflows.length === 0 ? (
+          {!Array.isArray(workflows) || workflows.length === 0 ? (
             <div className="col-span-full flex flex-col items-center justify-center py-12 text-center">
               <svg
                 className="w-16 h-16 text-muted mb-4"

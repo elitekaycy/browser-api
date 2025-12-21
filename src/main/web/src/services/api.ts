@@ -2,12 +2,22 @@ import type { Workflow, WorkflowExecution } from '../types/workflow';
 
 const API_BASE = '/api/v1';
 
+interface PageResponse<T> {
+  content: T[];
+  totalPages: number;
+  totalElements: number;
+  size: number;
+  number: number;
+}
+
 export class ApiService {
   // Workflows
   static async getWorkflows(): Promise<Workflow[]> {
-    const response = await fetch(`${API_BASE}/workflows`);
+    const response = await fetch(`${API_BASE}/workflows?size=100`);
     if (!response.ok) throw new Error('Failed to fetch workflows');
-    return response.json();
+    const data: PageResponse<Workflow> = await response.json();
+    // Extract the content array from the paginated response
+    return data.content || [];
   }
 
   static async getWorkflow(id: number): Promise<Workflow> {

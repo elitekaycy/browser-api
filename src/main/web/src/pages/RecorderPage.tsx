@@ -1,13 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRecorderStore } from '../stores/recorderStore';
 import { RecorderApiService } from '../services/recorderApi';
 import { useRecorderWebSocket } from '../hooks/useRecorderWebSocket';
 import { RecorderToolbar } from '../components/recorder/RecorderToolbar';
-import { BrowserCanvas, renderFrameOnCanvas } from '../components/recorder/BrowserCanvas';
+import { BrowserCanvas, type BrowserCanvasHandle } from '../components/recorder/BrowserCanvas';
 import { ActionsList } from '../components/recorder/ActionsList';
 import { ApiService } from '../services/api';
 
 export const RecorderPage = () => {
+  const canvasRef = useRef<BrowserCanvasHandle>(null);
   const {
     sessionId,
     url,
@@ -26,9 +27,11 @@ export const RecorderPage = () => {
   useRecorderWebSocket({
     sessionId,
     onFrame: (frameData) => {
-      renderFrameOnCanvas(frameData);
+      console.log('Received frame data, rendering...');
+      canvasRef.current?.renderFrame(frameData);
     },
     onAction: (action) => {
+      console.log('Received action:', action);
       addAction(action);
     },
   });
@@ -44,6 +47,11 @@ export const RecorderPage = () => {
       setLoading(true);
       const session = await RecorderApiService.createSession(url, 5);
       setSessionId(session.sessionId);
+
+      // Auto-start frame streaming (not recording) so we can see the page
+      console.log('Session created, starting frame streaming...');
+      await RecorderApiService.startRecording(session.sessionId);
+      setRecording(true);
     } catch (error) {
       console.error('Failed to load page:', error);
       alert('Failed to load page: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -165,6 +173,7 @@ export const RecorderPage = () => {
           {/* Browser Canvas */}
           <div className="flex-1 overflow-hidden">
             <BrowserCanvas
+              ref={canvasRef}
               onCanvasClick={handleCanvasClick}
               hasSession={!!sessionId}
             />
