@@ -86,6 +86,8 @@ export const WorkflowsPage = () => {
     await loadWorkflows();
   };
 
+  const { isLoading: storeLoading, error: storeError } = useWorkflowStore();
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -118,15 +120,38 @@ export const WorkflowsPage = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold">Workflows</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage and execute your browser automation workflows
-          </p>
-        </div>
+        {/* Error Message */}
+        {storeError && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm font-medium text-red-800">{storeError}</p>
+            </div>
+          </div>
+        )}
 
-        {/* Workflows Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Loading State */}
+        {storeLoading && workflows.length === 0 && (
+          <div className="flex justify-center items-center py-12">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-sm text-muted-foreground">Loading workflows...</p>
+            </div>
+          </div>
+        )}
+        {!storeLoading && (
+          <>
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold">Workflows</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Manage and execute your browser automation workflows
+              </p>
+            </div>
+
+            {/* Workflows Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {workflows.length === 0 ? (
             <div className="col-span-full flex flex-col items-center justify-center py-12 text-center">
               <svg
@@ -232,7 +257,9 @@ export const WorkflowsPage = () => {
               </div>
             ))
           )}
-        </div>
+            </div>
+          </>
+        )}
       </main>
 
       <WorkflowDialog
