@@ -13,7 +13,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,11 +20,10 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Controller for browser action recorder UI and REST API.
+ * REST API controller for browser action recorder.
  * <p>
- * Provides:
- * - Thymeleaf page serving for recorder UI
- * - REST API for session management and recording control
+ * Provides REST API for session management and recording control.
+ * The UI is served as a React SPA.
  */
 @Controller
 @Tag(name = "Recorder", description = "Browser action recorder with real-time streaming")
@@ -48,20 +46,6 @@ public class RecorderController {
         this.frameStreamingService = frameStreamingService;
         this.eventCaptureService = eventCaptureService;
         this.messagingTemplate = messagingTemplate;
-    }
-
-    /**
-     * Serve the recorder HTML page.
-     *
-     * @param model Spring MVC model for passing data to view
-     * @return Thymeleaf template name
-     */
-    @GetMapping("/recorder")
-    public String recorderPage(Model model) {
-        model.addAttribute("appName", "Browser Action Recorder");
-        model.addAttribute("version", "1.0.0");
-        model.addAttribute("apiBaseUrl", "/api/v1");
-        return "recorder";
     }
 
     // REST API Endpoints
