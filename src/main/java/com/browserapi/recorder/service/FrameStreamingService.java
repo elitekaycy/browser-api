@@ -160,37 +160,65 @@ public class FrameStreamingService {
     private void captureAndBroadcastFrame(RecorderSession session, UUID browserSessionId) {
         UUID sessionId = session.getSessionId();
 
-        // Get page from browser manager
-        PageSession pageSession = browserManager.getSession(browserSessionId)
-                .orElseThrow(() -> new IllegalStateException("Browser session not found: " + browserSessionId));
+        try {
+            // Get page from browser manager
+            PageSession pageSession = browserManager.getSession(browserSessionId)
+                    .orElseThrow(() -> new IllegalStateException("Browser session not found: " + browserSessionId));
 
-        Page page = pageSession.page();
+            Page page = pageSession.page();
 
-        // Capture screenshot
-        byte[] screenshotBytes = page.screenshot();
-        String screenshotBase64 = Base64.getEncoder().encodeToString(screenshotBytes);
+            // Check if page is closed
+            if (page.isClosed()) {
+                log.warn("Page is closed, stopping frame capture for session: {}", sessionId);
+                stopStreaming(sessionId);
+                return;
+            }
 
-        // Get and increment frame sequence
-        long frameSequence = frameSequences.compute(sessionId, (k, v) -> (v == null ? 0 : v) + 1);
+            // Capture screenshot with options to avoid binding conflicts
+            Page.ScreenshotOptions screenshotOptions = new Page.ScreenshotOptions()
+                    .setFullPage(false); // Capture viewport only for better performance
 
-        // Get current page URL
-        String currentUrl = page.url();
+            byte[] screenshotBytes = page.screenshot(screenshotOptions);
+            String screenshotBase64 = Base64.getEncoder().encodeToString(screenshotBytes);
 
-        // Create frame message
-        FrameMessage frameMessage = new FrameMessage(
-                frameSequence,
-                System.currentTimeMillis(),
-                screenshotBase64,
-                currentUrl,
-                screenshotBytes.length
-        );
+            // Get and increment frame sequence
+            long frameSequence = frameSequences.compute(sessionId, (k, v) -> (v == null ? 0 : v) + 1);
 
-        // Broadcast to WebSocket topic
-        String destination = "/topic/recorder/" + sessionId + "/frames";
-        messagingTemplate.convertAndSend(destination, frameMessage);
+            // Get current page URL safely
+            String currentUrl;
+            try {
+                currentUrl = page.url();
+            } catch (Exception e) {
+                currentUrl = "unknown";
+                log.debug("Could not get page URL: {}", e.getMessage());
+            }
 
-        log.trace("Frame broadcasted: sessionId={}, sequence={}, size={}KB",
-                sessionId, frameSequence, screenshotBytes.length / 1024);
+            // Create frame message
+            FrameMessage frameMessage = new FrameMessage(
+                    frameSequence,
+                    System.currentTimeMillis(),
+                    screenshotBase64,
+                    currentUrl,
+                    screenshotBytes.length
+            );
+
+            // Broadcast to WebSocket topic
+            String destination = "/topic/recorder/" + sessionId + "/frames";
+            messagingTemplate.convertAndSend(destination, frameMessage);
+
+            log.trace("Frame broadcasted: sessionId={}, sequence={}, size={}KB",
+                    sessionId, frameSequence, screenshotBytes.length / 1024);
+
+        } catch (com.microsoft.playwright.PlaywrightException e) {
+            // Handle Playwright binding errors gracefully
+            if (e.getMessage().contains("bindingCall") || e.getMessage().contains("Object doesn't exist")) {
+                log.debug("Playwright binding error (transient), skipping frame: {}", e.getMessage());
+                // Skip this frame and continue streaming
+            } else {
+                log.error("Playwright error capturing frame for session: {}", sessionId, e);
+                throw e;
+            }
+        }
     }
 
     /**
