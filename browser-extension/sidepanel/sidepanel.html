@@ -14,6 +14,7 @@
         <h1 class="logo">🎬 Workflow Recorder</h1>
         <div class="connection-status">
           <div id="connectionIndicator" class="status-dot offline" title="Backend connection status"></div>
+          <button id="settingsBtn" class="btn-icon" title="Settings">⚙️</button>
         </div>
       </div>
     </header>
@@ -183,6 +184,39 @@
         <div class="modal-footer">
           <button id="cancelSaveBtn" class="btn btn-secondary">Cancel</button>
           <button id="confirmSaveBtn" class="btn btn-success">💾 Save Workflow</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Settings</h2>
+          <button id="closeSettingsModal" class="btn-icon">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="backendUrl">Backend API URL *</label>
+            <input
+              type="url"
+              id="backendUrl"
+              class="input"
+              placeholder="http://localhost:8080/api/v1"
+              required
+            />
+            <p class="text-sm text-gray-500 mt-2">
+              The URL of your backend API. Change this if your backend is hosted remotely.
+            </p>
+          </div>
+          <div class="form-info">
+            <p><strong>Default:</strong> http://localhost:8080/api/v1</p>
+            <p><strong>Example (hosted):</strong> https://api.example.com/api/v1</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="resetSettingsBtn" class="btn btn-secondary">Reset to Default</button>
+          <button id="saveSettingsBtn" class="btn btn-success">💾 Save Settings</button>
         </div>
       </div>
     </div>

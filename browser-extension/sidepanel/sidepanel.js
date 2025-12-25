@@ -24,6 +24,9 @@ class SidePanelApp {
     await this.recordingView.init();
     await this.browseView.init();
 
+    // Initialize settings
+    this.initSettings();
+
     // Show browse view by default
     this.showView('browse');
 
@@ -34,6 +37,115 @@ class SidePanelApp {
     this.listenForMessages();
 
     console.log('[SidePanel] Initialized');
+  }
+
+  /**
+   * Initialize settings UI and handlers
+   */
+  initSettings() {
+    // Settings button
+    document.getElementById('settingsBtn').addEventListener('click', () => {
+      this.showSettingsModal();
+    });
+
+    // Close settings modal
+    document.getElementById('closeSettingsModal').addEventListener('click', () => {
+      this.hideSettingsModal();
+    });
+
+    // Save settings
+    document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+      this.saveSettings();
+    });
+
+    // Reset to default
+    document.getElementById('resetSettingsBtn').addEventListener('click', () => {
+      this.resetSettings();
+    });
+
+    // Close modal on background click
+    document.getElementById('settingsModal').addEventListener('click', (e) => {
+      if (e.target.id === 'settingsModal') {
+        this.hideSettingsModal();
+      }
+    });
+  }
+
+  /**
+   * Show settings modal
+   */
+  async showSettingsModal() {
+    const modal = document.getElementById('settingsModal');
+    const input = document.getElementById('backendUrl');
+
+    // Load current backend URL
+    const result = await chrome.storage.local.get(['backendUrl']);
+    input.value = result.backendUrl || 'http://localhost:8080/api/v1';
+
+    modal.classList.remove('hidden');
+    setTimeout(() => input.focus(), 100);
+  }
+
+  /**
+   * Hide settings modal
+   */
+  hideSettingsModal() {
+    document.getElementById('settingsModal').classList.add('hidden');
+  }
+
+  /**
+   * Save settings
+   */
+  async saveSettings() {
+    const input = document.getElementById('backendUrl');
+    const url = input.value.trim();
+
+    // Validate URL
+    if (!url) {
+      this.showToast('Please enter a valid URL', 'error');
+      return;
+    }
+
+    try {
+      new URL(url); // Validate URL format
+    } catch (error) {
+      this.showToast('Invalid URL format', 'error');
+      return;
+    }
+
+    try {
+      // Save to storage
+      await chrome.storage.local.set({ backendUrl: url });
+
+      // Notify background worker to update API client
+      await chrome.runtime.sendMessage({
+        type: 'UPDATE_BACKEND_URL',
+        url: url
+      });
+
+      this.showToast('Settings saved successfully!', 'success');
+      this.hideSettingsModal();
+
+      // Recheck connection with new URL
+      await this.checkConnection();
+
+      // Reload workflows with new backend
+      if (this.browseView) {
+        await this.browseView.loadWorkflows();
+      }
+    } catch (error) {
+      console.error('[SidePanel] Failed to save settings:', error);
+      this.showToast('Failed to save settings', 'error');
+    }
+  }
+
+  /**
+   * Reset settings to default
+   */
+  async resetSettings() {
+    const defaultUrl = 'http://localhost:8080/api/v1';
+    document.getElementById('backendUrl').value = defaultUrl;
+    await this.saveSettings();
   }
 
   /**

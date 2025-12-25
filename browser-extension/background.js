@@ -5,8 +5,19 @@
 
 import { WorkflowAPIClient } from './lib/api-client.js';
 
-// Initialize API client
-const apiClient = new WorkflowAPIClient('http://localhost:8080/api/v1');
+// Initialize API client (URL will be loaded from storage)
+let apiClient = new WorkflowAPIClient('http://localhost:8080/api/v1');
+
+// Load backend URL from storage and initialize API client
+async function initializeAPIClient() {
+  const result = await chrome.storage.local.get(['backendUrl']);
+  const backendUrl = result.backendUrl || 'http://localhost:8080/api/v1';
+  apiClient = new WorkflowAPIClient(backendUrl);
+  console.log('[Background] API client initialized with URL:', backendUrl);
+}
+
+// Initialize on startup
+initializeAPIClient();
 
 // State management
 let currentRecording = {
@@ -84,6 +95,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             success: true,
             recording: currentRecording
           };
+
+        // Update backend URL
+        case 'UPDATE_BACKEND_URL':
+          return await handleUpdateBackendURL(message.url);
 
         default:
           console.warn('[Background] Unknown message type:', message.type);
@@ -369,6 +384,25 @@ async function handleReplayWorkflow(workflowId, parameters, tab) {
     return result;
   } catch (error) {
     console.error('[Background] Replay failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Update backend URL
+ */
+async function handleUpdateBackendURL(url) {
+  try {
+    // Update API client
+    apiClient.setBaseUrl(url);
+
+    // Clear workflow cache
+    workflowCache = [];
+
+    console.log('[Background] Backend URL updated to:', url);
+    return { success: true };
+  } catch (error) {
+    console.error('[Background] Failed to update backend URL:', error);
     return { success: false, error: error.message };
   }
 }
