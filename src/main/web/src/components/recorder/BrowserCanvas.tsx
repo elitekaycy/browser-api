@@ -220,7 +220,7 @@ export const BrowserCanvas = forwardRef<BrowserCanvasHandle, BrowserCanvasProps>
                 ref={iframeRef}
                 onClick={handleClick}
                 className="w-full h-full border-0 bg-white cursor-crosshair"
-                sandbox="allow-same-origin"
+                sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
                 title="Browser Preview"
               />
             )}
