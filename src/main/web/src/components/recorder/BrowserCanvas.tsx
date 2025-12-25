@@ -18,6 +18,7 @@ export const BrowserCanvas = forwardRef<BrowserCanvasHandle, BrowserCanvasProps>
     const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
     const [renderMode, setRenderMode] = useState<'dom' | 'screenshot'>('dom');
     const [currentFrameData, setCurrentFrameData] = useState<FrameData | null>(null);
+    const [frameHTML, setFrameHTML] = useState<string>('');
 
     useEffect(() => {
       if (canvasRef.current) {
@@ -27,12 +28,6 @@ export const BrowserCanvas = forwardRef<BrowserCanvasHandle, BrowserCanvasProps>
 
     const renderDOMFrame = (frameData: FrameData) => {
       if (frameData.type !== 'dom') return;
-
-      const iframe = iframeRef.current;
-      if (!iframe) {
-        console.warn('iframe not available for DOM rendering');
-        return;
-      }
 
       try {
         // Create a complete HTML document with styles
@@ -84,13 +79,8 @@ export const BrowserCanvas = forwardRef<BrowserCanvasHandle, BrowserCanvasProps>
 </html>
         `;
 
-        // Write to iframe
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (iframeDoc) {
-          iframeDoc.open();
-          iframeDoc.write(fullHTML);
-          iframeDoc.close();
-        }
+        // Update iframe content via srcDoc (avoids security errors)
+        setFrameHTML(fullHTML);
 
         console.log('DOM frame rendered:', {
           viewport: `${frameData.viewportWidth}x${frameData.viewportHeight}`,
@@ -218,9 +208,10 @@ export const BrowserCanvas = forwardRef<BrowserCanvasHandle, BrowserCanvasProps>
             {renderMode === 'dom' && (
               <iframe
                 ref={iframeRef}
+                srcDoc={frameHTML}
                 onClick={handleClick}
                 className="w-full h-full border-0 bg-white cursor-crosshair"
-                sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
+                sandbox="allow-scripts allow-forms allow-popups allow-modals"
                 title="Browser Preview"
               />
             )}
