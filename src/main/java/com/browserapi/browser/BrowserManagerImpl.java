@@ -66,10 +66,13 @@ public class BrowserManagerImpl implements BrowserManager, DisposableBean {
                     .setArgs(Arrays.asList(
                         // Disable automation flags
                         "--disable-blink-features=AutomationControlled",
-                        // Enable features that make it look like a real browser
+                        // Sandbox and security
                         "--disable-dev-shm-usage",
                         "--disable-setuid-sandbox",
                         "--no-sandbox",
+                        // Allow third-party domains (Cloudflare challenges)
+                        "--disable-web-security",
+                        "--disable-features=IsolateOrigins,site-per-process",
                         // GPU and rendering
                         "--disable-gpu",
                         "--disable-software-rasterizer",
@@ -80,7 +83,10 @@ public class BrowserManagerImpl implements BrowserManager, DisposableBean {
                         "--disable-backgrounding-occluded-windows",
                         "--disable-renderer-backgrounding",
                         // Enable cookies and storage
-                        "--enable-features=NetworkService,NetworkServiceInProcess"
+                        "--enable-features=NetworkService,NetworkServiceInProcess",
+                        // Disable automation extensions detection
+                        "--disable-extensions",
+                        "--disable-plugins-discovery"
                     ));
 
             browser = playwright.chromium().launch(launchOptions);
@@ -149,14 +155,14 @@ public class BrowserManagerImpl implements BrowserManager, DisposableBean {
 
             defaultContext = browser.newContext(contextOptions);
 
-            // CRITICAL: Remove navigator.webdriver property via script injection
-            // This is the #1 indicator that automation frameworks check for
+            // CRITICAL: Enhanced stealth script for Cloudflare and advanced bot detection
             defaultContext.addInitScript("""
+                // 1. Remove navigator.webdriver (primary detection method)
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined
                 });
 
-                // Override the navigator.plugins to show realistic plugins
+                // 2. Override navigator.plugins to show realistic Chrome plugins
                 Object.defineProperty(navigator, 'plugins', {
                     get: () => [
                         {
@@ -180,7 +186,12 @@ public class BrowserManagerImpl implements BrowserManager, DisposableBean {
                     ]
                 });
 
-                // Override permissions API to avoid detection
+                // 3. Override navigator.languages (Cloudflare checks this)
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['en-US', 'en']
+                });
+
+                // 4. Override permissions API to avoid detection
                 const originalQuery = window.navigator.permissions.query;
                 window.navigator.permissions.query = (parameters) => (
                     parameters.name === 'notifications' ?
@@ -188,7 +199,7 @@ public class BrowserManagerImpl implements BrowserManager, DisposableBean {
                         originalQuery(parameters)
                 );
 
-                // Make chrome object look realistic
+                // 5. Make chrome object look realistic (Cloudflare checks for this)
                 window.chrome = {
                     runtime: {},
                     loadTimes: function() {},
@@ -196,12 +207,65 @@ public class BrowserManagerImpl implements BrowserManager, DisposableBean {
                     app: {}
                 };
 
-                // Override the automation-related properties
+                // 6. Override hardware properties
                 Object.defineProperty(navigator, 'maxTouchPoints', {get: () => 0});
                 Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
                 Object.defineProperty(navigator, 'deviceMemory', {get: () => 8});
 
-                console.log('[Stealth] Anti-detection initialized');
+                // 7. WebGL vendor/renderer spoofing (Cloudflare fingerprints this)
+                const getParameter = WebGLRenderingContext.prototype.getParameter;
+                WebGLRenderingContext.prototype.getParameter = function(parameter) {
+                    if (parameter === 37445) {
+                        return 'Intel Inc.';
+                    }
+                    if (parameter === 37446) {
+                        return 'Intel Iris OpenGL Engine';
+                    }
+                    return getParameter.call(this, parameter);
+                };
+
+                // 8. Override the Notification permission
+                Object.defineProperty(Notification, 'permission', {
+                    get: () => 'default'
+                });
+
+                // 9. Add missing chrome.runtime properties
+                if (window.chrome) {
+                    window.chrome.runtime = {
+                        connect: function() {},
+                        sendMessage: function() {},
+                        onMessage: {
+                            addListener: function() {},
+                            removeListener: function() {}
+                        }
+                    };
+                }
+
+                // 10. Override iframe contentWindow to avoid detection
+                const originalContentWindow = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow');
+                Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
+                    get: function() {
+                        const win = originalContentWindow.get.call(this);
+                        if (win) {
+                            try {
+                                win.navigator = navigator;
+                            } catch (e) {
+                                // Cross-origin iframe, ignore
+                            }
+                        }
+                        return win;
+                    }
+                });
+
+                // 11. Mock the automation-specific properties that Playwright adds
+                delete navigator.__proto__.webdriver;
+
+                // 12. Override toString methods to prevent detection
+                Object.defineProperty(navigator.permissions.query, 'toString', {
+                    value: () => 'function query() { [native code] }'
+                });
+
+                console.log('[Stealth] Advanced anti-detection initialized (Cloudflare compatible)');
             """);
 
             log.info("Browser context created with stealth configuration (JS: enabled, Cookies: enabled, WebDriver: hidden)");
