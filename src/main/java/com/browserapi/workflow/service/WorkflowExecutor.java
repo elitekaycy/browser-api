@@ -191,7 +191,10 @@ public class WorkflowExecutor {
                     selector,
                     value,
                     action.waitMs(),
-                    description
+                    description,
+                    action.extractType(),
+                    action.attributeName(),
+                    action.jsonPath()
             );
         }
 

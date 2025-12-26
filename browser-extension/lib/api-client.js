@@ -30,7 +30,8 @@ export class WorkflowAPIClient {
    */
   async getWorkflows(page = 0, size = 100) {
     const response = await this.request(`/workflows?page=${page}&size=${size}`);
-    return response;
+    // Backend returns Spring Data Page object, extract content array
+    return response.content || [];
   }
 
   /**
@@ -128,7 +129,8 @@ export class WorkflowAPIClient {
    */
   async getMostSuccessful(page = 0, size = 10) {
     const response = await this.request(`/workflows/most-successful?page=${page}&size=${size}`);
-    return response;
+    // Handle paginated response
+    return response.content || response;
   }
 
   /**
@@ -198,16 +200,30 @@ export class WorkflowAPIClient {
 
       const response = await fetch(url, config);
 
+      console.log(`[APIClient] Response status: ${response.status} ${response.statusText}`);
+
       // Handle non-JSON responses (e.g., DELETE returns 204 No Content)
       if (response.status === 204 || response.status === 205) {
+        console.log('[APIClient] No content response');
         return null;
       }
 
+      // Get response text first to handle parse errors
+      const responseText = await response.text();
+      console.log(`[APIClient] Response body (first 200 chars):`, responseText.substring(0, 200));
+
       // Parse JSON response
-      const data = await response.json();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('[APIClient] Failed to parse JSON:', parseError);
+        throw new Error('Invalid JSON response from server');
+      }
 
       // Check for HTTP errors
       if (!response.ok) {
+        console.error('[APIClient] HTTP error:', response.status, data);
         throw new Error(
           data.message || data.error || `HTTP ${response.status}: ${response.statusText}`
         );
@@ -219,7 +235,7 @@ export class WorkflowAPIClient {
       console.error('[APIClient] Request failed:', error);
 
       // Enhance error message
-      if (error.message.includes('Failed to fetch')) {
+      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
         throw new Error(
           'Cannot connect to backend API. Make sure the server is running at ' + this.baseUrl
         );
@@ -235,9 +251,10 @@ export class WorkflowAPIClient {
    */
   async ping() {
     try {
-      await this.getStatistics();
+      await this.getWorkflows(0, 1);
       return true;
     } catch (error) {
+      console.error('[APIClient] Ping failed:', error);
       return false;
     }
   }

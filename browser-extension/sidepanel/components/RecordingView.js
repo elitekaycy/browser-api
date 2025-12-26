@@ -31,9 +31,13 @@ export class RecordingView {
       this.startRecording();
     });
 
-    // Pause recording button
+    // Pause/Resume recording button (dynamic)
     document.getElementById('pauseRecordBtn').addEventListener('click', () => {
-      this.pauseRecording();
+      if (this.isPaused) {
+        this.resumeRecording();
+      } else {
+        this.pauseRecording();
+      }
     });
 
     // Stop recording button
@@ -53,6 +57,14 @@ export class RecordingView {
     document.getElementById('confirmSaveBtn').addEventListener('click', () => {
       this.saveWorkflow();
     });
+
+    // Add data extraction button
+    const addExtractionBtn = document.getElementById('addExtractionBtn');
+    if (addExtractionBtn) {
+      addExtractionBtn.addEventListener('click', () => {
+        this.enterHighlightMode();
+      });
+    }
 
     // Close modal on background click
     document.getElementById('saveModal').addEventListener('click', (e) => {
@@ -91,28 +103,25 @@ export class RecordingView {
    */
   async startRecording() {
     try {
-      // Get current active tab
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-      if (!tab) {
-        this.app.showToast('No active tab found', 'error');
-        return;
-      }
+      console.log('[RecordingView] Starting recording...');
 
       // Send message to background to start recording
+      // Background will find the correct tab automatically
       const response = await chrome.runtime.sendMessage({
         type: 'START_RECORDING'
       });
 
-      if (response.success) {
+      console.log('[RecordingView] Start recording response:', response);
+
+      if (response && response.success) {
         this.app.showToast('Recording started!', 'success');
         this.app.showView('recording');
       } else {
-        this.app.showToast('Failed to start recording: ' + response.error, 'error');
+        this.app.showToast('Failed to start recording: ' + (response?.error || 'Unknown error'), 'error');
       }
     } catch (error) {
       console.error('[RecordingView] Start recording failed:', error);
-      this.app.showToast('Failed to start recording', 'error');
+      this.app.showToast('Failed to start recording: ' + error.message, 'error');
     }
   }
 
@@ -280,8 +289,17 @@ export class RecordingView {
 
     // Update UI
     document.getElementById('recordingText').textContent = 'Paused';
-    document.getElementById('pauseRecordBtn').textContent = '▶️ Resume';
-    document.getElementById('pauseRecordBtn').onclick = () => this.resumeRecording();
+
+    // Update pause button to show resume icon and text
+    const pauseBtn = document.getElementById('pauseRecordBtn');
+    pauseBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M8 5v14l11-7z"/>
+      </svg>
+      Resume
+    `;
+    pauseBtn.classList.remove('btn-warning');
+    pauseBtn.classList.add('btn-success');
 
     // Stop duration timer
     this.stopDurationTimer();
@@ -297,8 +315,17 @@ export class RecordingView {
 
     // Update UI
     document.getElementById('recordingText').textContent = 'Recording...';
-    document.getElementById('pauseRecordBtn').textContent = '⏸️ Pause';
-    document.getElementById('pauseRecordBtn').onclick = () => this.pauseRecording();
+
+    // Update pause button to show pause icon and text
+    const pauseBtn = document.getElementById('pauseRecordBtn');
+    pauseBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+      </svg>
+      Pause
+    `;
+    pauseBtn.classList.remove('btn-success');
+    pauseBtn.classList.add('btn-warning');
 
     // Restart duration timer
     this.startDurationTimer();
@@ -440,10 +467,112 @@ export class RecordingView {
     document.getElementById('workflowDescription').value = '';
     document.getElementById('workflowTags').value = '';
 
+    // Render extraction actions
+    this.renderExtractionActions();
+
     // Focus name input
     setTimeout(() => {
       document.getElementById('workflowName').focus();
     }, 100);
+  }
+
+  /**
+   * Render extraction actions in the save modal
+   */
+  renderExtractionActions() {
+    // Find or create extraction container
+    let extractionContainer = document.getElementById('extractionActionsContainer');
+
+    if (!extractionContainer) {
+      // Create container if it doesn't exist
+      const formInfo = document.querySelector('.form-info');
+      extractionContainer = document.createElement('div');
+      extractionContainer.id = 'extractionActionsContainer';
+      formInfo.insertAdjacentElement('afterend', extractionContainer);
+    }
+
+    // Filter extraction actions
+    const extractionActions = this.actions.filter(action => action.type === 'EXTRACT');
+
+    if (extractionActions.length === 0) {
+      extractionContainer.innerHTML = '';
+      return;
+    }
+
+    // Render extraction actions
+    extractionContainer.innerHTML = `
+      <div class="extraction-actions-header">
+        <h4>📊 Data Extraction Points (${extractionActions.length})</h4>
+        <p class="text-sm">These elements will be extracted during workflow execution</p>
+      </div>
+      <div class="extraction-actions-list">
+        ${extractionActions.map((action, index) => {
+          const globalIndex = this.actions.indexOf(action);
+          return `
+            <div class="extraction-card" data-index="${globalIndex}">
+              <div class="extraction-card-header">
+                <span class="extraction-type-badge ${action.extractType.toLowerCase()}">${action.extractType}</span>
+                <button class="remove-extraction-btn" data-index="${globalIndex}" title="Remove extraction">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="extraction-card-body">
+                <div class="extraction-field">
+                  <span class="field-label">Selector:</span>
+                  <code class="field-value">${action.selector}</code>
+                </div>
+                ${action.extractType === 'ATTRIBUTE' ? `
+                  <div class="extraction-field">
+                    <span class="field-label">Attribute:</span>
+                    <code class="field-value">${action.attributeName}</code>
+                  </div>
+                ` : ''}
+                ${action.extractType === 'JSON' && action.jsonPath ? `
+                  <div class="extraction-field">
+                    <span class="field-label">JSON Path:</span>
+                    <code class="field-value">${action.jsonPath}</code>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    // Attach remove button event listeners
+    extractionContainer.querySelectorAll('.remove-extraction-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const index = parseInt(btn.dataset.index);
+        this.removeExtraction(index);
+      });
+    });
+  }
+
+  /**
+   * Remove an extraction action
+   */
+  removeExtraction(index) {
+    if (index < 0 || index >= this.actions.length) return;
+
+    const action = this.actions[index];
+    if (action.type !== 'EXTRACT') return;
+
+    // Remove from actions array
+    this.actions.splice(index, 1);
+
+    // Update action count
+    document.getElementById('saveModalActionCount').textContent = this.actions.length.toString();
+
+    // Re-render extraction actions
+    this.renderExtractionActions();
+
+    // Show toast
+    this.app.showToast('Extraction removed', 'info');
   }
 
   /**
@@ -475,5 +604,196 @@ export class RecordingView {
     document.getElementById('actionList').innerHTML = '';
     document.getElementById('actionCount').textContent = '0';
     document.getElementById('recordingDuration').textContent = '00:00';
+  }
+
+  /**
+   * Enter highlight mode to select element for data extraction
+   */
+  async enterHighlightMode() {
+    try {
+      // Get the current tab
+      const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      const webTabs = tabs.filter(t => t.url && !t.url.startsWith('chrome-extension://'));
+
+      if (webTabs.length === 0) {
+        this.app.showToast('No active web page found. Please open a tab first.', 'error');
+        return;
+      }
+
+      const tab = webTabs[0];
+
+      // Hide save modal temporarily
+      this.hideSaveModal();
+
+      // Send message to content script to enable highlight mode
+      const response = await chrome.tabs.sendMessage(tab.id, {
+        type: 'ENTER_HIGHLIGHT_MODE'
+      });
+
+      if (response && response.success) {
+        this.app.showToast('Click on an element to extract data from...', 'info');
+
+        // Listen for element selection
+        const listener = (message, sender) => {
+          if (message.type === 'ELEMENT_SELECTED' && sender.tab.id === tab.id) {
+            this.onElementSelected(message.selector, message.element);
+            chrome.runtime.onMessage.removeListener(listener);
+          }
+        };
+        chrome.runtime.onMessage.addListener(listener);
+      } else {
+        this.app.showToast('Failed to enter highlight mode: ' + (response?.error || 'Unknown error'), 'error');
+        this.showSaveModal();
+      }
+    } catch (error) {
+      console.error('[RecordingView] Failed to enter highlight mode:', error);
+      this.app.showToast('Failed to enter highlight mode: ' + error.message, 'error');
+      this.showSaveModal();
+    }
+  }
+
+  /**
+   * Handle element selection in highlight mode
+   */
+  async onElementSelected(selector, elementInfo) {
+    // Show extraction type dialog
+    const extractType = await this.showExtractionDialog(selector, elementInfo);
+
+    if (extractType) {
+      // Add EXTRACT action
+      const extractAction = {
+        type: 'EXTRACT',
+        selector: selector,
+        value: null,
+        extractType: extractType.type,
+        attributeName: extractType.attributeName || null,
+        jsonPath: extractType.jsonPath || null,
+        description: `Extract ${extractType.type} from ${selector}`,
+        timestamp: Date.now()
+      };
+
+      this.actions.push(extractAction);
+
+      this.app.showToast(`✅ Data extraction added: ${extractType.type}`, 'success');
+
+      // Update the action count in the modal
+      document.getElementById('saveModalActionCount').textContent = this.actions.length.toString();
+
+      // Re-render extraction actions to show the new one
+      this.renderExtractionActions();
+    }
+
+    // Show the save modal again (it was hidden during highlight mode)
+    const modal = document.getElementById('saveModal');
+    modal.classList.remove('hidden');
+  }
+
+  /**
+   * Show extraction type selection dialog
+   */
+  async showExtractionDialog(selector, elementInfo) {
+    return new Promise((resolve) => {
+      // Create dialog overlay
+      const dialog = document.createElement('div');
+      dialog.className = 'extraction-dialog-overlay';
+      dialog.innerHTML = `
+        <div class="extraction-dialog">
+          <h3>Select Data Extraction Type</h3>
+          <p class="dialog-subtitle">Element: <code>${selector}</code></p>
+
+          <div class="extraction-options">
+            <label class="extraction-option">
+              <input type="radio" name="extractType" value="TEXT" checked>
+              <div class="option-content">
+                <strong>Text Content</strong>
+                <span>Extract visible text from the element</span>
+              </div>
+            </label>
+
+            <label class="extraction-option">
+              <input type="radio" name="extractType" value="HTML">
+              <div class="option-content">
+                <strong>HTML Content</strong>
+                <span>Extract full HTML including markup</span>
+              </div>
+            </label>
+
+            <label class="extraction-option">
+              <input type="radio" name="extractType" value="ATTRIBUTE">
+              <div class="option-content">
+                <strong>Attribute Value</strong>
+                <span>Extract a specific attribute (href, src, etc.)</span>
+              </div>
+            </label>
+
+            <label class="extraction-option">
+              <input type="radio" name="extractType" value="JSON">
+              <div class="option-content">
+                <strong>JSON Data</strong>
+                <span>Parse and extract JSON content</span>
+              </div>
+            </label>
+          </div>
+
+          <div id="attributeInput" class="attribute-input hidden">
+            <label for="attributeName">Attribute Name:</label>
+            <input type="text" id="attributeName" placeholder="e.g., href, src, data-id">
+          </div>
+
+          <div class="dialog-buttons">
+            <button id="cancelExtraction" class="btn btn-secondary">Cancel</button>
+            <button id="confirmExtraction" class="btn btn-primary">Add Extraction</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(dialog);
+
+      // Show attribute input when ATTRIBUTE is selected
+      const attributeRadio = dialog.querySelector('input[value="ATTRIBUTE"]');
+      const attributeInput = dialog.querySelector('#attributeInput');
+
+      dialog.querySelectorAll('input[name="extractType"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+          if (radio.value === 'ATTRIBUTE') {
+            attributeInput.classList.remove('hidden');
+          } else {
+            attributeInput.classList.add('hidden');
+          }
+        });
+      });
+
+      // Cancel button
+      dialog.querySelector('#cancelExtraction').addEventListener('click', () => {
+        dialog.remove();
+        resolve(null);
+      });
+
+      // Confirm button
+      dialog.querySelector('#confirmExtraction').addEventListener('click', () => {
+        const selectedType = dialog.querySelector('input[name="extractType"]:checked').value;
+        const result = { type: selectedType };
+
+        if (selectedType === 'ATTRIBUTE') {
+          const attrName = dialog.querySelector('#attributeName').value.trim();
+          if (!attrName) {
+            this.app.showToast('Please enter an attribute name', 'error');
+            return;
+          }
+          result.attributeName = attrName;
+        }
+
+        dialog.remove();
+        resolve(result);
+      });
+
+      // Close on background click
+      dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) {
+          dialog.remove();
+          resolve(null);
+        }
+      });
+    });
   }
 }

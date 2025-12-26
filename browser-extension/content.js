@@ -4,6 +4,11 @@
  * Note: Content scripts don't support ES modules in Manifest V3, so this is standalone
  */
 
+// Prevent double injection of event listeners
+if (!window.__WORKFLOW_RECORDER_INJECTED__) {
+  window.__WORKFLOW_RECORDER_INJECTED__ = true;
+  console.log('[ContentScript] Initializing...');
+
 // Recording state
 let isRecording = false;
 let isPaused = false;
@@ -152,6 +157,11 @@ function attachEventListeners() {
   document.addEventListener('submit', submitHandler, true);
   eventListeners.set('submit', submitHandler);
 
+  // Keydown events (for Enter key on inputs)
+  const keydownHandler = handleKeydown.bind(this);
+  document.addEventListener('keydown', keydownHandler, true);
+  eventListeners.set('keydown', keydownHandler);
+
   console.log('[ContentScript] Event listeners attached');
 }
 
@@ -282,6 +292,40 @@ function handleSubmit(event) {
 }
 
 /**
+ * Handle keydown events (Enter key on inputs)
+ */
+function handleKeydown(event) {
+  if (!isRecording || isPaused) return;
+
+  // Only capture Enter key
+  if (event.key !== 'Enter') return;
+
+  const target = event.target;
+
+  // Only on input fields and textareas
+  if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
+
+  // Skip if it's inside a form (will be caught by submit handler)
+  const form = target.closest('form');
+  if (form) return;
+
+  // Record Enter key press for inputs without forms (e.g., search boxes)
+  const selectors = selectorGen.generate(target);
+  const description = selectorGen.getElementDescription(target);
+
+  const action = {
+    type: 'PRESS_ENTER',
+    selector: selectors[0],
+    value: target.value,
+    waitMs: null,
+    description: `Press Enter in ${description}`,
+    timestamp: Date.now()
+  };
+
+  sendAction(action);
+}
+
+/**
  * Send captured action to background script
  */
 function sendAction(action) {
@@ -359,6 +403,35 @@ function showRecordingIndicator() {
 }
 
 /**
+ * Update recording indicator state
+ */
+function updateRecordingIndicator(state) {
+  if (!recordingIndicator) return;
+
+  const indicator = recordingIndicator.querySelector('div');
+  if (!indicator) return;
+
+  if (state === 'paused') {
+    indicator.style.background = '#f59e0b'; // Warning orange
+    indicator.innerHTML = `
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 8px;">
+        <rect x="6" y="4" width="4" height="16"/>
+        <rect x="14" y="4" width="4" height="16"/>
+      </svg>
+      Recording Paused
+    `;
+  } else if (state === 'recording') {
+    indicator.style.background = '#ef4444'; // Red
+    indicator.innerHTML = `
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 8px;">
+        <circle cx="12" cy="12" r="6"/>
+      </svg>
+      Recording...
+    `;
+  }
+}
+
+/**
  * Hide recording indicator
  */
 function hideRecordingIndicator() {
@@ -415,51 +488,262 @@ window.addEventListener('popstate', () => {
   }
 });
 
+console.log('[ContentScript] Event listeners and state initialized');
+
+} // End of injection guard
+
 /**
  * Message listener for commands from background script
+ * This is OUTSIDE the guard so it's always available
  */
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('[ContentScript] Received message:', message.type);
+if (!window.__WORKFLOW_RECORDER_LISTENER_ADDED__) {
+  window.__WORKFLOW_RECORDER_LISTENER_ADDED__ = true;
 
-  switch (message.type) {
-    case 'START_RECORDING':
-      startRecording();
-      sendResponse({ success: true });
-      break;
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('[ContentScript] Received message:', message.type);
 
-    case 'STOP_RECORDING':
-      stopRecording();
-      sendResponse({ success: true });
-      break;
+    switch (message.type) {
+      case 'PING':
+        // Health check to see if content script is loaded
+        sendResponse({ success: true, loaded: true });
+        break;
 
-    case 'PAUSE_RECORDING':
-      isPaused = true;
-      sendResponse({ success: true });
-      break;
+      case 'CHECK_WORKFLOW_PLAYER':
+        // Check if WorkflowPlayer is loaded
+        if (typeof WorkflowPlayer !== 'undefined') {
+          sendResponse({ success: true, loaded: true });
+        } else {
+          sendResponse({ success: false, loaded: false });
+        }
+        break;
 
-    case 'RESUME_RECORDING':
-      isPaused = false;
-      sendResponse({ success: true });
-      break;
+      case 'START_RECORDING':
+        startRecording();
+        sendResponse({ success: true });
+        break;
 
-    case 'REPLAY_WORKFLOW':
-      // Import and execute workflow player
-      import(chrome.runtime.getURL('lib/workflow-player.js'))
-        .then(module => {
-          const player = new module.WorkflowPlayer();
-          return player.play(message.workflow, message.parameters);
-        })
-        .then(result => sendResponse(result))
-        .catch(error => sendResponse({ success: false, error: error.message }));
+      case 'STOP_RECORDING':
+        stopRecording();
+        sendResponse({ success: true });
+        break;
 
-      return true; // Keep channel open for async response
+      case 'PAUSE_RECORDING':
+        console.log('[ContentScript] Pausing recording');
+        isPaused = true;
+        updateRecordingIndicator('paused');
+        sendResponse({ success: true });
+        break;
 
-    default:
-      console.warn('[ContentScript] Unknown message type:', message.type);
-      sendResponse({ success: false, error: 'Unknown message type' });
+      case 'RESUME_RECORDING':
+        console.log('[ContentScript] Resuming recording');
+        isPaused = false;
+        updateRecordingIndicator('recording');
+        sendResponse({ success: true });
+        break;
+
+      case 'REPLAY_WORKFLOW':
+        // Execute workflow player
+        (async () => {
+          try {
+            // Check for WorkflowPlayer in both places
+            let PlayerClass = null;
+
+            if (typeof window.WorkflowPlayer !== 'undefined') {
+              console.log('[ContentScript] WorkflowPlayer found on window');
+              PlayerClass = window.WorkflowPlayer;
+            } else if (typeof WorkflowPlayer !== 'undefined') {
+              console.log('[ContentScript] WorkflowPlayer found in global scope');
+              PlayerClass = WorkflowPlayer;
+            } else {
+              console.error('[ContentScript] WorkflowPlayer not found anywhere');
+              console.log('[ContentScript] window.WorkflowPlayer:', typeof window.WorkflowPlayer);
+              console.log('[ContentScript] WorkflowPlayer:', typeof WorkflowPlayer);
+              console.log('[ContentScript] Window keys with Workflow:', Object.keys(window).filter(k => k.includes('Workflow')));
+              sendResponse({
+                success: false,
+                error: 'WorkflowPlayer not loaded. Please reload the page and try again.'
+              });
+              return;
+            }
+
+            console.log('[ContentScript] Starting workflow replay...');
+            const player = new PlayerClass();
+            const result = await player.play(message.workflow, message.parameters);
+            sendResponse(result);
+          } catch (error) {
+            console.error('[ContentScript] Workflow replay error:', error);
+            sendResponse({ success: false, error: error.message });
+          }
+        })();
+
+        return true; // Keep channel open for async response
+
+      case 'ENTER_HIGHLIGHT_MODE':
+        enterHighlightMode();
+        sendResponse({ success: true });
+        break;
+
+      default:
+        console.warn('[ContentScript] Unknown message type:', message.type);
+        sendResponse({ success: false, error: 'Unknown message type' });
+    }
+
+    return false;
+  });
+
+  console.log('[ContentScript] Message listener registered');
+}
+
+/**
+ * Highlight mode state and functions (outside injection guard)
+ */
+let isHighlightMode = false;
+let highlightedElement = null;
+let highlightOverlay = null;
+
+function enterHighlightMode() {
+  console.log('[ContentScript] Entering highlight mode');
+  isHighlightMode = true;
+
+  // Create highlight overlay
+  highlightOverlay = document.createElement('div');
+  highlightOverlay.id = 'workflow-highlight-overlay';
+  highlightOverlay.style.cssText = `
+    position: absolute;
+    pointer-events: none;
+    border: 3px solid #10b981;
+    background: rgba(16, 185, 129, 0.1);
+    z-index: 999998;
+    transition: all 0.1s ease;
+  `;
+  document.body.appendChild(highlightOverlay);
+
+  // Add instruction banner
+  const banner = document.createElement('div');
+  banner.id = 'workflow-highlight-banner';
+  banner.style.cssText = `
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #10b981;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 999999;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    pointer-events: none;
+  `;
+  banner.textContent = 'Hover over an element and click to extract data from it';
+  document.body.appendChild(banner);
+
+  // Add event listeners for highlighting
+  document.addEventListener('mouseover', highlightOnHover, true);
+  document.addEventListener('click', selectElement, true);
+  document.addEventListener('keydown', exitHighlightModeOnEscape, true);
+}
+
+function highlightOnHover(event) {
+  if (!isHighlightMode) return;
+
+  const target = event.target;
+
+  // Ignore our own overlays
+  if (target.id === 'workflow-highlight-overlay' ||
+      target.id === 'workflow-highlight-banner' ||
+      target === highlightOverlay) {
+    return;
   }
 
-  return false;
-});
+  highlightedElement = target;
+
+  // Update overlay position
+  const rect = target.getBoundingClientRect();
+  highlightOverlay.style.top = (rect.top + window.scrollY) + 'px';
+  highlightOverlay.style.left = (rect.left + window.scrollX) + 'px';
+  highlightOverlay.style.width = rect.width + 'px';
+  highlightOverlay.style.height = rect.height + 'px';
+  highlightOverlay.style.display = 'block';
+}
+
+function selectElement(event) {
+  if (!isHighlightMode) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const target = event.target;
+
+  // Ignore our own overlays
+  if (target.id === 'workflow-highlight-overlay' ||
+      target.id === 'workflow-highlight-banner') {
+    return;
+  }
+
+  console.log('[ContentScript] Element selected for extraction');
+
+  // Generate selector for the element (use global selectorGen if available)
+  let selector = target.tagName.toLowerCase();
+  if (target.id) {
+    selector = '#' + target.id;
+  } else if (target.className) {
+    const classes = target.className.split(' ').filter(c => c).slice(0, 2).join('.');
+    if (classes) selector = target.tagName.toLowerCase() + '.' + classes;
+  }
+
+  const elementInfo = {
+    tagName: target.tagName,
+    text: target.textContent?.trim().substring(0, 50),
+    attributes: Array.from(target.attributes).map(attr => ({
+      name: attr.name,
+      value: attr.value
+    }))
+  };
+
+  // Exit highlight mode
+  exitHighlightModeCleanup();
+
+  // Send selected element back to extension
+  chrome.runtime.sendMessage({
+    type: 'ELEMENT_SELECTED',
+    selector: selector,
+    element: elementInfo
+  }).catch(error => {
+    console.warn('[ContentScript] Failed to send element selection:', error);
+  });
+}
+
+function exitHighlightModeOnEscape(event) {
+  // Exit on Escape key
+  if (event.key === 'Escape') {
+    exitHighlightModeCleanup();
+  }
+}
+
+function exitHighlightModeCleanup() {
+  console.log('[ContentScript] Exiting highlight mode');
+  isHighlightMode = false;
+  highlightedElement = null;
+
+  // Remove overlay
+  if (highlightOverlay) {
+    highlightOverlay.remove();
+    highlightOverlay = null;
+  }
+
+  // Remove banner
+  const banner = document.getElementById('workflow-highlight-banner');
+  if (banner) {
+    banner.remove();
+  }
+
+  // Remove event listeners
+  document.removeEventListener('mouseover', highlightOnHover, true);
+  document.removeEventListener('click', selectElement, true);
+  document.removeEventListener('keydown', exitHighlightModeOnEscape, true);
+}
 
 console.log('[ContentScript] Workflow recorder content script loaded');

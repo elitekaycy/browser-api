@@ -65,6 +65,9 @@ public class ActionExecutor {
                 case PRESS_KEY -> {
                     executePressKey(page, action);
                 }
+                case PRESS_ENTER -> {
+                    executePressEnter(page, action);
+                }
                 case SCREENSHOT -> {
                     return executeScreenshot(page, action, startTime);
                 }
@@ -76,6 +79,9 @@ public class ActionExecutor {
                 }
                 case CLEAR -> {
                     executeClear(page, action);
+                }
+                case EXTRACT -> {
+                    return executeExtract(page, action, startTime);
                 }
                 default -> throw new IllegalArgumentException("Unsupported action type: " + action.type());
             }
@@ -202,6 +208,17 @@ public class ActionExecutor {
         }
     }
 
+    private void executePressEnter(Page page, Action action) {
+        validateSelector(action);
+        // Fill the input field with the value
+        if (action.value() != null && !action.value().isEmpty()) {
+            page.fill(action.selector(), action.value());
+        }
+        // Press Enter key on the input field
+        page.press(action.selector(), "Enter");
+        log.info("Pressed Enter on input: {}", action.selector());
+    }
+
     private ActionResult executeScreenshot(Page page, Action action, long startTime) {
         byte[] screenshotBytes = page.screenshot();
         String screenshotBase64 = Base64.getEncoder().encodeToString(screenshotBytes);
@@ -226,6 +243,57 @@ public class ActionExecutor {
         page.fill(action.selector(), "");
     }
 
+    private ActionResult executeExtract(Page page, Action action, long startTime) {
+        validateSelector(action);
+
+        if (action.extractType() == null || action.extractType().isBlank()) {
+            throw new IllegalArgumentException("EXTRACT action requires extractType (TEXT, HTML, ATTRIBUTE, or JSON)");
+        }
+
+        // Wait for element to be present
+        page.waitForSelector(action.selector(), new Page.WaitForSelectorOptions().setTimeout(DEFAULT_WAIT_TIMEOUT_MS));
+
+        String extractedData;
+        switch (action.extractType().toUpperCase()) {
+            case "TEXT" -> {
+                extractedData = page.locator(action.selector()).first().innerText();
+                log.info("Extracted text: {}", truncate(extractedData, 100));
+            }
+            case "HTML" -> {
+                extractedData = page.locator(action.selector()).first().innerHTML();
+                log.info("Extracted HTML: {} characters", extractedData.length());
+            }
+            case "ATTRIBUTE" -> {
+                if (action.attributeName() == null || action.attributeName().isBlank()) {
+                    throw new IllegalArgumentException("EXTRACT action with ATTRIBUTE type requires attributeName");
+                }
+                extractedData = page.locator(action.selector()).first().getAttribute(action.attributeName());
+                if (extractedData == null) {
+                    extractedData = "";
+                    log.warn("Attribute '{}' not found on element", action.attributeName());
+                }
+                log.info("Extracted attribute '{}': {}", action.attributeName(), truncate(extractedData, 100));
+            }
+            case "JSON" -> {
+                String text = page.locator(action.selector()).first().innerText();
+                // For now, return the raw text. JSONPath processing can be added later if needed.
+                extractedData = text;
+                log.info("Extracted JSON text: {}", truncate(extractedData, 100));
+
+                // If jsonPath is provided, log a warning that it's not yet implemented
+                if (action.jsonPath() != null && !action.jsonPath().isBlank()) {
+                    log.warn("JSONPath filtering not yet implemented, returning raw JSON text");
+                }
+            }
+            default -> throw new IllegalArgumentException("Unknown extract type: " + action.extractType() +
+                ". Must be TEXT, HTML, ATTRIBUTE, or JSON");
+        }
+
+        long executionTime = System.currentTimeMillis() - startTime;
+        log.info("Data extraction completed: {} ({}ms)", action.description(), executionTime);
+        return ActionResult.success(action, executionTime, page.url(), extractedData);
+    }
+
     // Validation helpers
 
     private void validateSelector(Action action) {
@@ -240,5 +308,10 @@ public class ActionExecutor {
             throw new IllegalArgumentException(
                     action.type() + " action requires a value");
         }
+    }
+
+    private String truncate(String text, int maxLength) {
+        if (text == null) return "";
+        return text.length() <= maxLength ? text : text.substring(0, maxLength) + "...";
     }
 }

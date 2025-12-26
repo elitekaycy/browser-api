@@ -64,7 +64,9 @@ export class BrowseView {
         size: 100
       });
 
-      if (response.success) {
+      console.log('[BrowseView] Response received:', response);
+
+      if (response && response.success) {
         this.workflows = response.workflows || [];
         this.filteredWorkflows = [...this.workflows];
 
@@ -73,8 +75,10 @@ export class BrowseView {
         // Render workflow list
         this.renderWorkflowList();
       } else {
-        console.error('[BrowseView] Failed to load workflows:', response.error);
-        this.app.showToast('Failed to load workflows', 'error');
+        console.error('[BrowseView] Failed to load workflows:', response?.error || 'Unknown error');
+        this.app.showToast('Failed to load workflows: ' + (response?.error || 'Unknown error'), 'error');
+        // Show empty state on error
+        document.getElementById('emptyState').classList.remove('hidden');
       }
     } catch (error) {
       console.error('[BrowseView] Load error:', error);
@@ -254,32 +258,41 @@ export class BrowseView {
     console.log('[BrowseView] Replaying workflow:', this.selectedWorkflow.id);
 
     try {
-      // Get current active tab
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      // Get current active web tab (not the side panel)
+      const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      const webTabs = tabs.filter(t => t.url && !t.url.startsWith('chrome-extension://'));
 
-      if (!tab) {
-        this.app.showToast('No active tab found', 'error');
+      if (webTabs.length === 0) {
+        this.app.showToast('No active web page found. Please open a tab first.', 'error');
         return;
       }
 
-      // Send replay message to background
+      const tab = webTabs[0];
+
+      // Send replay message to background with tab ID
       const response = await chrome.runtime.sendMessage({
         type: 'REPLAY_WORKFLOW',
         workflowId: this.selectedWorkflow.id,
+        tabId: tab.id,
         parameters: {} // TODO: Add parameter input UI
       });
 
-      if (response.success) {
-        this.app.showToast('Workflow completed successfully!', 'success');
+      if (response && response.success) {
+        // Check if there's extracted data
+        if (response.extractedData && response.extractedData.length > 0) {
+          this.showExtractionResults(response.extractedData);
+        } else {
+          this.app.showToast('Workflow completed successfully!', 'success');
+        }
 
         // Refresh workflow to get updated stats
         await this.loadWorkflows();
       } else {
-        this.app.showToast('Workflow failed: ' + response.error, 'error');
+        this.app.showToast('Workflow failed: ' + (response?.error || 'Unknown error'), 'error');
       }
     } catch (error) {
       console.error('[BrowseView] Replay error:', error);
-      this.app.showToast('Failed to replay workflow', 'error');
+      this.app.showToast('Failed to replay workflow: ' + error.message, 'error');
     }
   }
 
@@ -355,6 +368,99 @@ export class BrowseView {
 
     // Re-render list
     this.renderWorkflowList();
+  }
+
+  /**
+   * Show extraction results dialog
+   */
+  showExtractionResults(extractedData) {
+    console.log('[BrowseView] Showing extraction results:', extractedData);
+
+    // Create dialog
+    const dialog = document.createElement('div');
+    dialog.className = 'extraction-dialog-overlay';
+
+    // Build extraction items HTML
+    const extractionsHtml = extractedData.map((item, index) => `
+      <div class="extraction-result-item">
+        <div class="extraction-result-header">
+          <strong>Extraction ${index + 1}</strong>
+          <span class="extraction-type-badge">${item.type}</span>
+        </div>
+        <div class="extraction-result-meta">
+          <div><strong>Selector:</strong> <code>${this.escapeHtml(item.selector)}</code></div>
+          <div><strong>Timestamp:</strong> ${new Date(item.timestamp).toLocaleString()}</div>
+        </div>
+        <div class="extraction-result-value">
+          <label>Extracted Value:</label>
+          <pre>${this.escapeHtml(item.value || '(empty)')}</pre>
+          <button class="btn btn-sm btn-secondary copy-extraction-btn" data-value="${this.escapeHtml(item.value || '')}">
+            Copy to Clipboard
+          </button>
+        </div>
+      </div>
+    `).join('');
+
+    dialog.innerHTML = `
+      <div class="extraction-dialog" style="max-width: 700px;">
+        <h3>Workflow Completed with Data Extraction</h3>
+        <p class="dialog-subtitle">
+          ${extractedData.length} data point${extractedData.length > 1 ? 's' : ''} extracted
+        </p>
+
+        <div class="extraction-results-list">
+          ${extractionsHtml}
+        </div>
+
+        <div class="dialog-buttons">
+          <button id="downloadExtractionsJson" class="btn btn-secondary">Download JSON</button>
+          <button id="closeExtractionResults" class="btn btn-primary">Close</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(dialog);
+
+    // Close button
+    dialog.querySelector('#closeExtractionResults').addEventListener('click', () => {
+      dialog.remove();
+      this.app.showToast('Workflow completed successfully!', 'success');
+    });
+
+    // Download JSON button
+    dialog.querySelector('#downloadExtractionsJson').addEventListener('click', () => {
+      const dataStr = JSON.stringify(extractedData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `extraction-${Date.now()}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      this.app.showToast('Extraction data downloaded', 'success');
+    });
+
+    // Copy to clipboard buttons
+    dialog.querySelectorAll('.copy-extraction-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const value = e.target.dataset.value;
+        try {
+          await navigator.clipboard.writeText(value);
+          this.app.showToast('Copied to clipboard', 'success');
+        } catch (error) {
+          console.error('Failed to copy:', error);
+          this.app.showToast('Failed to copy to clipboard', 'error');
+        }
+      });
+    });
+
+    // Close on background click
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) {
+        dialog.remove();
+        this.app.showToast('Workflow completed successfully!', 'success');
+      }
+    });
   }
 
   /**

@@ -50,6 +50,11 @@ public enum ActionType {
     PRESS_KEY,
 
     /**
+     * Press Enter key on an input field (for search boxes without forms).
+     */
+    PRESS_ENTER,
+
+    /**
      * Take a screenshot.
      */
     SCREENSHOT,
@@ -67,5 +72,10 @@ public enum ActionType {
     /**
      * Clear an input field.
      */
-    CLEAR
+    CLEAR,
+
+    /**
+     * Extract data from an element (text, HTML, attribute, or JSON).
+     */
+    EXTRACT
 }

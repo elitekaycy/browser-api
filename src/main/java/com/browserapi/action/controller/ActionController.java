@@ -247,10 +247,12 @@ public class ActionController {
             case SCROLL -> "Scroll to an element";
             case HOVER -> "Hover over an element";
             case PRESS_KEY -> "Press a keyboard key";
+            case PRESS_ENTER -> "Fill an input field and press Enter (for search boxes)";
             case SCREENSHOT -> "Take a screenshot of the page";
             case NAVIGATE -> "Navigate to a URL";
             case CHECK -> "Check or uncheck a checkbox";
             case CLEAR -> "Clear an input field";
+            case EXTRACT -> "Extract data from an element (text, HTML, attribute, or JSON)";
         };
     }
 
@@ -258,7 +260,7 @@ public class ActionController {
         return switch (type) {
             case CLICK, SCROLL, HOVER, SUBMIT, CLEAR ->
                 new ActionRequirements(true, false, false);
-            case FILL, SELECT, PRESS_KEY ->
+            case FILL, SELECT, PRESS_KEY, PRESS_ENTER ->
                 new ActionRequirements(true, true, false);
             case NAVIGATE ->
                 new ActionRequirements(false, true, false);
@@ -267,6 +269,8 @@ public class ActionController {
             case WAIT_NAVIGATION, SCREENSHOT ->
                 new ActionRequirements(false, false, false);
             case CHECK ->
+                new ActionRequirements(true, false, false);
+            case EXTRACT ->
                 new ActionRequirements(true, false, false);
         };
     }
@@ -304,12 +308,21 @@ public class ActionController {
             Integer waitMs,
 
             @Parameter(description = "Human-readable description")
-            String description
+            String description,
+
+            @Parameter(description = "Extract type (TEXT, HTML, ATTRIBUTE, JSON) - for EXTRACT action")
+            String extractType,
+
+            @Parameter(description = "Attribute name - for EXTRACT action with ATTRIBUTE type")
+            String attributeName,
+
+            @Parameter(description = "JSONPath expression - for EXTRACT action with JSON type")
+            String jsonPath
     ) {
         public Action toAction() {
             String desc = description != null ? description :
                     type + " " + (selector != null ? selector : value != null ? value : "");
-            return new Action(type, selector, value, waitMs, desc);
+            return new Action(type, selector, value, waitMs, desc, extractType, attributeName, jsonPath);
         }
     }
 

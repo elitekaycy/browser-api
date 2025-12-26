@@ -3,11 +3,12 @@
  * Executes workflow actions sequentially in the browser
  */
 
-export class WorkflowPlayer {
+class WorkflowPlayer {
   constructor() {
     this.isPlaying = false;
     this.currentStep = 0;
     this.totalSteps = 0;
+    this.extractedData = [];
   }
 
   /**
@@ -52,7 +53,8 @@ export class WorkflowPlayer {
       return {
         success: true,
         stepsCompleted: actions.length,
-        finalUrl: window.location.href
+        finalUrl: window.location.href,
+        extractedData: this.extractedData || []
       };
 
     } catch (error) {
@@ -118,8 +120,18 @@ export class WorkflowPlayer {
         await this.pressKey(action.selector, action.value);
         break;
 
+      case 'PRESS_ENTER':
+        // Fill the input with the value, then press Enter
+        await this.fill(action.selector, action.value);
+        await this.pressKey(action.selector, 'Enter');
+        break;
+
       case 'CLEAR':
         await this.clear(action.selector);
+        break;
+
+      case 'EXTRACT':
+        await this.extract(action);
         break;
 
       case 'SCREENSHOT':
@@ -246,6 +258,74 @@ export class WorkflowPlayer {
   }
 
   /**
+   * Extract data from element
+   */
+  async extract(action) {
+    const element = await this.waitForElement(action.selector);
+
+    let extractedData;
+    const extractType = (action.extractType || 'TEXT').toUpperCase();
+
+    switch (extractType) {
+      case 'TEXT':
+        extractedData = element.innerText || element.textContent;
+        break;
+
+      case 'HTML':
+        extractedData = element.innerHTML;
+        break;
+
+      case 'ATTRIBUTE':
+        if (!action.attributeName) {
+          throw new Error('EXTRACT action with ATTRIBUTE type requires attributeName');
+        }
+        extractedData = element.getAttribute(action.attributeName);
+        if (extractedData === null) {
+          extractedData = '';
+          console.warn(`[WorkflowPlayer] Attribute '${action.attributeName}' not found on element`);
+        }
+        break;
+
+      case 'JSON':
+        const text = element.innerText || element.textContent;
+        try {
+          extractedData = JSON.parse(text);
+          // Apply JSONPath if provided (simplified - just return the parsed JSON for now)
+          if (action.jsonPath) {
+            console.warn('[WorkflowPlayer] JSONPath filtering not yet implemented, returning full JSON');
+          }
+          // Convert back to string for storage
+          extractedData = JSON.stringify(extractedData);
+        } catch (error) {
+          console.error('[WorkflowPlayer] Failed to parse JSON:', error);
+          extractedData = text; // Fallback to raw text
+        }
+        break;
+
+      default:
+        throw new Error(`Unknown extract type: ${extractType}. Must be TEXT, HTML, ATTRIBUTE, or JSON`);
+    }
+
+    // Store extracted data in player instance
+    if (!this.extractedData) {
+      this.extractedData = [];
+    }
+
+    this.extractedData.push({
+      selector: action.selector,
+      type: extractType,
+      value: extractedData,
+      timestamp: new Date().toISOString()
+    });
+
+    console.log('[WorkflowPlayer] Extracted data:', {
+      type: extractType,
+      selector: action.selector,
+      valueLength: extractedData?.length || 0
+    });
+  }
+
+  /**
    * Wait for element to appear and be visible
    */
   async waitForElement(selector, timeout = 10000) {
@@ -367,5 +447,7 @@ export class WorkflowPlayer {
   }
 }
 
-// Export default instance
-export const workflowPlayer = new WorkflowPlayer();
+// Make WorkflowPlayer globally available for content script injection
+if (typeof window !== 'undefined') {
+  window.WorkflowPlayer = WorkflowPlayer;
+}

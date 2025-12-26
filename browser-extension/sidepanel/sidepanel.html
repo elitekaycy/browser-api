@@ -26,11 +26,24 @@
         <!-- Recording Controls -->
         <div class="recording-controls">
           <button id="startRecordBtn" class="btn btn-success btn-large">
-            ▶️ Start Recording
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            Start Recording
           </button>
           <div id="recordingButtons" class="btn-group hidden">
-            <button id="pauseRecordBtn" class="btn btn-warning">⏸️ Pause</button>
-            <button id="stopRecordBtn" class="btn btn-danger">⏹️ Stop</button>
+            <button id="pauseRecordBtn" class="btn btn-warning btn-icon-text">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+              </svg>
+              Pause
+            </button>
+            <button id="stopRecordBtn" class="btn btn-danger btn-icon-text">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="6" width="12" height="12"/>
+              </svg>
+              Stop
+            </button>
           </div>
         </div>
 
@@ -79,7 +92,12 @@
             placeholder="Search workflows..."
           />
           <button id="newWorkflowBtn" class="btn btn-primary">
-            ➕ New Recording
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="16"/>
+              <line x1="8" y1="12" x2="16" y2="12"/>
+            </svg>
+            New Recording
           </button>
         </div>
 
@@ -130,10 +148,17 @@
           </div>
           <div class="details-footer">
             <button id="replayBtn" class="btn btn-primary btn-large">
-              ▶️ Replay Workflow
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+              Replay Workflow
             </button>
             <button id="deleteBtn" class="btn btn-danger">
-              🗑️ Delete
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+              Delete
             </button>
           </div>
         </div>
@@ -180,10 +205,28 @@
             <p><strong>Actions:</strong> <span id="saveModalActionCount">0</span></p>
             <p><strong>Starting URL:</strong> <span id="saveModalUrl">—</span></p>
           </div>
+          <div class="form-group">
+            <button id="addExtractionBtn" class="btn btn-secondary" style="width: 100%;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10h-8V2h-2v8H3v2h8v8h2v-8h8z"/>
+              </svg>
+              Add Data Extraction
+            </button>
+            <p class="text-sm text-gray-500 mt-2">
+              Optionally add an extraction point to capture data from the last step
+            </p>
+          </div>
         </div>
         <div class="modal-footer">
           <button id="cancelSaveBtn" class="btn btn-secondary">Cancel</button>
-          <button id="confirmSaveBtn" class="btn btn-success">💾 Save Workflow</button>
+          <button id="confirmSaveBtn" class="btn btn-success">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            Save Workflow
+          </button>
         </div>
       </div>
     </div>
@@ -216,7 +259,14 @@
         </div>
         <div class="modal-footer">
           <button id="resetSettingsBtn" class="btn btn-secondary">Reset to Default</button>
-          <button id="saveSettingsBtn" class="btn btn-success">💾 Save Settings</button>
+          <button id="saveSettingsBtn" class="btn btn-success">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            Save Settings
+          </button>
         </div>
       </div>
     </div>
