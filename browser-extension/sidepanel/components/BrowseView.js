@@ -28,7 +28,7 @@ export class BrowseView {
       this.app.recordingView.startRecording();
     });
 
-    // Search input
+    // Search input - auto-search on input
     document.getElementById('searchInput').addEventListener('input', (e) => {
       this.handleSearch(e.target.value);
     });
@@ -45,6 +45,68 @@ export class BrowseView {
     document.getElementById('deleteBtn').addEventListener('click', () => {
       this.deleteWorkflow();
     });
+
+    // Copy URL button
+    document.getElementById('copyUrlBtn').addEventListener('click', () => {
+      this.copyWorkflowUrl();
+    });
+
+    // Copy API endpoint button
+    document.getElementById('copyApiEndpointBtn').addEventListener('click', () => {
+      this.copyApiEndpoint();
+    });
+
+    // Copy curl command button
+    document.getElementById('copyCurlBtn').addEventListener('click', () => {
+      this.copyCurlCommand();
+    });
+  }
+
+  /**
+   * Copy workflow URL to clipboard
+   */
+  async copyWorkflowUrl() {
+    if (!this.selectedWorkflow) return;
+
+    try {
+      await navigator.clipboard.writeText(this.selectedWorkflow.url);
+      this.app.showToast('URL copied to clipboard', 'success');
+    } catch (error) {
+      console.error('[BrowseView] Failed to copy URL:', error);
+      this.app.showToast('Failed to copy URL', 'error');
+    }
+  }
+
+  /**
+   * Copy API endpoint to clipboard
+   */
+  async copyApiEndpoint() {
+    if (!this.selectedWorkflow) return;
+
+    try {
+      const endpoint = document.getElementById('apiEndpoint').textContent;
+      await navigator.clipboard.writeText(endpoint);
+      this.app.showToast('API endpoint copied', 'success');
+    } catch (error) {
+      console.error('[BrowseView] Failed to copy API endpoint:', error);
+      this.app.showToast('Failed to copy endpoint', 'error');
+    }
+  }
+
+  /**
+   * Copy curl command to clipboard
+   */
+  async copyCurlCommand() {
+    if (!this.selectedWorkflow) return;
+
+    try {
+      const curlCommand = document.getElementById('curlExample').textContent;
+      await navigator.clipboard.writeText(curlCommand);
+      this.app.showToast('Curl command copied', 'success');
+    } catch (error) {
+      console.error('[BrowseView] Failed to copy curl:', error);
+      this.app.showToast('Failed to copy command', 'error');
+    }
   }
 
   /**
@@ -204,8 +266,31 @@ export class BrowseView {
       });
     }
 
+    // API Trigger information
+    this.populateApiTriggerInfo(workflow);
+
     // Actions list
     this.renderActionsList(workflow.actions || []);
+  }
+
+  /**
+   * Populate API trigger information
+   */
+  async populateApiTriggerInfo(workflow) {
+    // Get backend URL from storage
+    const result = await chrome.storage.local.get(['backendUrl']);
+    const backendUrl = result.backendUrl || 'http://localhost:8080/api/v1';
+
+    // Build API endpoint
+    const apiEndpoint = `${backendUrl}/workflows/${workflow.id}/execute`;
+    document.getElementById('apiEndpoint').textContent = apiEndpoint;
+
+    // Build curl example
+    const curlCommand = `curl -X POST "${apiEndpoint}" \\
+  -H "Content-Type: application/json" \\
+  -d '{}'`;
+
+    document.getElementById('curlExample').textContent = curlCommand;
   }
 
   /**

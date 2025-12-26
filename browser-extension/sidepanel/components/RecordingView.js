@@ -45,6 +45,11 @@ export class RecordingView {
       this.stopRecording();
     });
 
+    // Cancel recording button
+    document.getElementById('cancelRecordBtn').addEventListener('click', () => {
+      this.cancelRecording();
+    });
+
     // Save modal buttons
     document.getElementById('closeSaveModal').addEventListener('click', () => {
       this.hideSaveModal();
@@ -173,6 +178,26 @@ export class RecordingView {
       }
     } catch (error) {
       console.error('[RecordingView] Stop failed:', error);
+    }
+  }
+
+  /**
+   * Cancel recording without saving
+   */
+  async cancelRecording() {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'STOP_RECORDING'
+      });
+
+      if (response.success) {
+        // Reset recording state without showing save modal
+        this.resetRecording();
+        this.app.showToast('Recording cancelled', 'info');
+        this.app.showView('browse');
+      }
+    } catch (error) {
+      console.error('[RecordingView] Cancel failed:', error);
     }
   }
 
@@ -698,51 +723,47 @@ export class RecordingView {
       dialog.className = 'extraction-dialog-overlay';
       dialog.innerHTML = `
         <div class="extraction-dialog">
-          <h3>Select Data Extraction Type</h3>
-          <p class="dialog-subtitle">Element: <code>${selector}</code></p>
+          <div class="extraction-header">
+            <h3>Extract Data</h3>
+            <button class="dialog-close" id="closeExtraction">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="20" height="20">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="extraction-selector">
+            <code>${selector}</code>
+          </div>
 
           <div class="extraction-options">
             <label class="extraction-option">
               <input type="radio" name="extractType" value="TEXT" checked>
-              <div class="option-content">
-                <strong>Text Content</strong>
-                <span>Extract visible text from the element</span>
-              </div>
+              <span>Text</span>
             </label>
 
             <label class="extraction-option">
               <input type="radio" name="extractType" value="HTML">
-              <div class="option-content">
-                <strong>HTML Content</strong>
-                <span>Extract full HTML including markup</span>
-              </div>
+              <span>HTML</span>
             </label>
 
             <label class="extraction-option">
               <input type="radio" name="extractType" value="ATTRIBUTE">
-              <div class="option-content">
-                <strong>Attribute Value</strong>
-                <span>Extract a specific attribute (href, src, etc.)</span>
-              </div>
+              <span>Attribute</span>
             </label>
 
             <label class="extraction-option">
               <input type="radio" name="extractType" value="JSON">
-              <div class="option-content">
-                <strong>JSON Data</strong>
-                <span>Parse and extract JSON content</span>
-              </div>
+              <span>JSON</span>
             </label>
           </div>
 
           <div id="attributeInput" class="attribute-input hidden">
-            <label for="attributeName">Attribute Name:</label>
-            <input type="text" id="attributeName" placeholder="e.g., href, src, data-id">
+            <input type="text" id="attributeName" class="input" placeholder="Attribute name (e.g., href, src)">
           </div>
 
-          <div class="dialog-buttons">
-            <button id="cancelExtraction" class="btn btn-secondary">Cancel</button>
-            <button id="confirmExtraction" class="btn btn-primary">Add Extraction</button>
+          <div class="dialog-actions">
+            <button id="confirmExtraction" class="btn btn-primary btn-large">Add Extraction</button>
           </div>
         </div>
       `;
@@ -750,21 +771,21 @@ export class RecordingView {
       document.body.appendChild(dialog);
 
       // Show attribute input when ATTRIBUTE is selected
-      const attributeRadio = dialog.querySelector('input[value="ATTRIBUTE"]');
       const attributeInput = dialog.querySelector('#attributeInput');
 
       dialog.querySelectorAll('input[name="extractType"]').forEach(radio => {
         radio.addEventListener('change', () => {
           if (radio.value === 'ATTRIBUTE') {
             attributeInput.classList.remove('hidden');
+            dialog.querySelector('#attributeName').focus();
           } else {
             attributeInput.classList.add('hidden');
           }
         });
       });
 
-      // Cancel button
-      dialog.querySelector('#cancelExtraction').addEventListener('click', () => {
+      // Close button
+      dialog.querySelector('#closeExtraction').addEventListener('click', () => {
         dialog.remove();
         resolve(null);
       });
